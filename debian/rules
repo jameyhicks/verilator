@@ -4,6 +4,7 @@
 	dh $@
 
 override_dh_auto_configure:
+	autoconf
 	dh_auto_configure -- --prefix=/usr LDFLAGS="$(LDFLAGS) -Wl,--as-needed"
 
 override_dh_installexamples:

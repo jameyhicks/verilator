@@ -1,1 +1,3 @@
-debian/verilator_profcfunc.1
+verilator.1
+verilator_coverage.1
+verilator_profcfunc.1

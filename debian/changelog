@@ -1,4 +1,4 @@
-verilator (3.856-1connectal1) precise; urgency=medium
+verilator (3.856-1connectal1) trusty; urgency=medium
 
   * Fixes issue 467, adding more old-style $display options
 
