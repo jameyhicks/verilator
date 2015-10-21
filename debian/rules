@@ -1,0 +1,13 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_configure:
+	dh_auto_configure -- --prefix=/usr LDFLAGS="$(LDFLAGS) -Wl,--as-needed"
+
+override_dh_installexamples:
+	mv debian/verilator/usr/share/verilator/examples debian/verilator/usr/share/doc/verilator/
+
+override_dh_compress:
+	dh_compress -Xexamples

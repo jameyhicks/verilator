@@ -1,0 +1,280 @@
+verilator (3.856-1connectal1) precise; urgency=medium
+
+  * Fixes issue 467, adding more old-style $display options
+
+ -- Jamey Hicks <jamey.hicks@gmail.com>  Wed, 21 Oct 2015 13:12:42 -0400
+
+verilator (3.856-1) unstable; urgency=medium
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sun, 16 Mar 2014 21:30:31 +0200
+
+verilator (3.855-1) unstable; urgency=low
+
+  * New upstream release.
+  * Refreshed shebang.diff patch.
+  * debian/copyright: update copyright years
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Mon, 27 Jan 2014 10:44:06 +0200
+
+verilator (3.854-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/control: Bumped Standards-Version to 3.9.5
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Tue, 03 Dec 2013 09:22:24 +0200
+
+verilator (3.853-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Tue, 01 Oct 2013 23:09:16 +0200
+
+verilator (3.852-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Mon, 30 Sep 2013 17:12:08 +0200
+
+verilator (3.851-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sat, 24 Aug 2013 15:28:02 +0200
+
+verilator (3.850-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Mon, 10 Jun 2013 09:46:14 +0200
+
+verilator (3.847-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Mon, 20 May 2013 17:18:43 +0200
+
+verilator (3.846-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sun, 24 Mar 2013 18:38:33 +0200
+
+verilator (3.845-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sun, 10 Feb 2013 17:14:43 +0200
+
+verilator (3.844-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/copyright: Updated copyright years.
+  * Refresh patch.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sun, 13 Jan 2013 11:25:29 +0200
+
+verilator (3.843-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/control:
+    + Bumped Standards-Version to 3.9.4
+    + Remove obsolete DMUA field
+    + Use canonical URIs in VCS-* fields
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Thu, 03 Jan 2013 12:52:18 +0200
+
+verilator (3.841-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Thu, 06 Sep 2012 11:30:26 +0200
+
+verilator (3.840-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Wed, 01 Aug 2012 11:36:02 +0200
+
+verilator (3.833-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Wed, 18 Apr 2012 17:14:05 +0200
+
+verilator (3.832-1) unstable; urgency=low
+
+  * New upstream release.
+  * Bumped compat level to 9.
+  * debian/control: Updated Standards-Version to 3.9.3
+  * debian/copyright: Updated copyright format & years.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Thu, 08 Mar 2012 16:34:21 +0200
+
+verilator (3.831-1) unstable; urgency=low
+
+  * New upstream release.
+  * Refreshed patch: shebang.diff
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sat, 11 Feb 2012 15:00:59 +0200
+
+verilator (3.830-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Tue, 29 Nov 2011 16:48:53 +0200
+
+verilator (3.824-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Wed, 26 Oct 2011 05:38:30 +0200
+
+verilator (3.821-1) unstable; urgency=low
+
+  * New upstream release.
+  * Dropped Fix-PowerPC-runtime-error.patch patch as it is included in new
+    upstream release
+  * debian/copyright: Updated copyright format
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sun, 18 Sep 2011 14:30:17 +0200
+
+verilator (3.820-2) unstable; urgency=low
+
+  * Cherry-picked Fix-PowerPC-runtime-error.patch from upstream VCS
+    (Closes: #598256)
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Tue, 23 Aug 2011 13:15:42 +0200
+
+verilator (3.820-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sun, 31 Jul 2011 07:18:48 +0200
+
+verilator (3.813-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Thu, 07 Jul 2011 13:53:39 +0200
+
+verilator (3.812-1) unstable; urgency=low
+
+  * New upstream release.
+  * debian/copyright: Updated copyright years
+  * debian/control: Bumped Standards-Version to 3.9.2
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sat, 09 Apr 2011 23:21:43 +0200
+
+verilator (3.811-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Wed, 16 Feb 2011 17:11:11 +0200
+
+verilator (3.810-1) unstable; urgency=low
+
+  * New upstream release.
+  * Refreshed shebang.diff patch
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sat, 22 Jan 2011 10:08:37 +0200
+
+verilator (3.805-1) unstable; urgency=low
+
+  * New upstream release.
+  * Upload to unstable.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sun, 07 Nov 2010 10:32:20 +0200
+
+verilator (3.804-1) experimental; urgency=low
+
+  * New upstream release
+  * Bumped compat level to 8
+  * debian/control: Bumped Standards-Version to 3.9.1, no changes needed.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sun, 26 Sep 2010 19:21:30 +0300
+
+verilator (3.803-1) unstable; urgency=low
+
+  * New upstream release.
+  * Removed patch typos.diff as it got applied upstream
+  * debian/control: Bumped Standards-Version to 3.9.0 (no changes
+    needed)
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Thu, 15 Jul 2010 21:00:20 +0300
+
+verilator (3.802-1) unstable; urgency=low
+
+  * New upstream release.
+  * Removed install_perms.diff patche, as it got applied upstream.
+  * Refreshed typos.diff patch to fix a new typo, and remove fixes that got
+    applied upstream.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Sat, 01 May 2010 22:56:15 +0300
+
+verilator (3.801-1) unstable; urgency=low
+
+  * New upstream release (Closes: #577187)
+  * Switched to 3.0 (quilt) source format.
+  * debian/control:
+    + Set pkg-electronics as Maintainer and add myself to Uploaders.
+    + Bumped Standards-Version to 3.8.4
+    + Added proper Vcs-* fields.
+    + Removed "the" from package description.
+    + Added DMUA
+  * debian/docs:
+    + Remove README & readme.pod since they do not provide useful information
+      to user.
+    + Added verilator.html & verilator.pdf
+  * debian/watch: set the upstream URL to one that can be checked.
+  * Added manpage for verilator_profcfunc
+  * Added debian/links, debian/doc-base, debian/manpages
+  * Remove debian/dirs
+  * debian/rules:
+    + No more need to override dh_auto_test since upstream now skips SystemC
+      tests if SystemC is not installed.
+    + No need to override dh_auto_install
+    + Override dh_installexamples to move examples dir from
+      /usr/share/verilator to /usr/share/doc/verilator
+  * Added install_perms.diff patch to install data files without executable
+    permissions.
+  * Added typos.diff patch to fix some spelling mistakes in verilator
+    executable & manpage.
+  * Added shebang.diff patch to add proper shebangs.
+  * debian/copyright:
+    + Converted to machine-readable format.
+    + Changed packaging license to match that of upstream.
+
+ -- أحمد المحمودي (Ahmed El-Mahmoudy) <aelmahmoudy@sabily.org>  Wed, 21 Apr 2010 23:33:46 +0200
+
+verilator (3.800-5) unstable; urgency=low
+
+  * prevent make from running test and failing because SystemC is not present
+  * now using override_dh_auto_test instead of override_dh_auto_make
+
+ -- Iztok Jeras <iztok.jeras@gmail.com>  Mon, 08 Feb 2010 19:51:39 +0100
+
+verilator (3.800-4) unstable; urgency=low
+
+  * prevent make from running test and failing because SystemC is not present
+
+ -- Iztok Jeras <iztok.jeras@gmail.com>  Mon, 08 Feb 2010 11:06:10 +0100
+
+verilator (3.800-3) unstable; urgency=low
+
+  * Added bison to dependencies
+
+ -- Iztok Jeras <iztok.jeras@gmail.com>  Mon, 08 Feb 2010 11:06:10 +0100
+
+verilator (3.800-2) unstable; urgency=low
+
+  * Added flex to dependencies
+
+ -- Iztok Jeras <iztok.jeras@gmail.com>  Mon, 08 Feb 2010 10:51:20 +0100
+
+verilator (3.800-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Iztok Jeras <iztok.jeras@gmail.com>  Mon, 08 Feb 2010 07:52:28 +0100
