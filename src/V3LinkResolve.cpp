@@ -251,7 +251,7 @@ private:
 	}
     }
 
-    void expectFormat(AstNode* nodep, const string& format, AstNode* argp, bool isScan) {
+    void expectFormat(AstNode* nodep, const string& format, AstNode* argp, bool isScan, string *newFormatp = 0) {
 	// Check display arguments
 	bool inPct = false;
 	for (string::const_iterator it = format.begin(); it != format.end(); ++it) {
@@ -285,12 +285,76 @@ private:
 	    }
 	}
 	if (argp) {
+	    string newFormat(format);
+	    int skipCount = 0;
+	    while (argp) {
+		cerr << "argp: " << argp << endl;
+		cerr << argp->fileline() << endl;
+		cerr << "argp->dtype(): " << argp->dtypep() << endl;
+		if (skipCount--) {
+		    argp = argp->nextp();
+		    cerr << "skipping" << endl;
+		    continue;
+		}
+		int isFromString = 0;
+		AstConst *constp = argp->castConst();
+		if (constp) {
+		    //cerr << "number: " << constp->num() << " fromString: " << constp->num().isFromString() << endl;
+		    isFromString = constp->num().isFromString();
+		}
+		if (isFromString) {
+		    int numchars = argp->dtypep()->width()/8;
+		    string str(numchars, ' ');
+		    for (int i = 0; i < numchars; i += 4) {
+			uint32_t dataword = constp->num().dataWord(i/4);
+			for (int j = 0; (j < 4) && (i+j) < numchars; j++) {
+			    unsigned char c = dataword & 0xFF;
+			    fprintf(stderr, "i=%d j=%d c=%d:%c\n", i, j, c, c);
+			    str[numchars-i-j-1] = c;
+			    dataword = dataword >> 8;
+			}
+		    }
+		    // now scan for % operators
+		    int inpercent = 0;
+		    for (int i = 0; i < numchars; i += 4) {
+			char c = str[i];
+			if (!inpercent && c == '%') {
+			    inpercent = 1;
+			} else if (inpercent) {
+			    inpercent = 0;
+			    switch (c) {
+			    case '0': case '1': case '2': case '3': case '4':
+			    case '5': case '6': case '7': case '8': case '9':
+			    case '.':
+				inpercent = 1;
+				break;
+			    case '%':
+				break;
+			    default:
+				if (V3Number::displayedFmtLegal(c))
+				    skipCount++;
+			    }
+			}
+		    }
+		    newFormat.append(str);
+		    argp->unlinkFrBack(); //FIXME: pushDeletep(nodep); VL_DANGLING(nodep);
+		} else {
+		    newFormat.append(", %h");
+		}
+		cerr << "newFormat: \"" << newFormat << endl;
+		argp = argp->nextp();
+	    }
+	    if (newFormatp)
+		*newFormatp = newFormat;
+	}
+	if (argp) {
 	    argp->v3error("Extra arguments for $display-like format");
 	}
     }
 
     void expectDescriptor(AstNode* nodep, AstNodeVarRef* filep) {
-	if (!filep) nodep->v3error("Unsupported: $fopen/$fclose/$f* descriptor must be a simple variable");
+	if (!filep) //nodep->v3error("Unsupported: $fopen/$fclose/$f* descriptor must be a simple variable");
+	    cerr << nodep->fileline() << "Expected: $fopen/$fclose/$f* descriptor must be a simple variable" << endl;
 	if (filep && filep->varp()) filep->varp()->attrFileDescr(true);
     }
 
@@ -331,7 +395,10 @@ private:
     }
     virtual void visit(AstSFormatF* nodep, AstNUser*) {
 	nodep->iterateChildren(*this);
-	expectFormat(nodep, nodep->text(), nodep->exprsp(), false);
+	string newFormat;
+	expectFormat(nodep, nodep->text(), nodep->exprsp(), false, &newFormat);
+	if (newFormat.size())
+	    nodep->text(newFormat);
 	if ((nodep->backp()->castDisplay() && nodep->backp()->castDisplay()->displayType().needScopeTracking())
 	    || nodep->formatScopeTracking()) {
 	    nodep->scopeNamep(new AstScopeName(nodep->fileline()));
