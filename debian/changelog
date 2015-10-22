@@ -1,4 +1,16 @@
-verilator (3.856-1connectal1) trusty; urgency=medium
+verilator (3.877-1connectal1precise2) precise; urgency=medium
+
+  * squash doc-base for now
+
+ -- Jamey Hicks <jamey.hicks@gmail.com>  Wed, 21 Oct 2015 21:44:47 -0400
+
+verilator (3.877-1connectal1precise1) precise; urgency=medium
+
+  * Added build dependence on autoconf
+
+ -- Jamey Hicks <jamey.hicks@gmail.com>  Wed, 21 Oct 2015 14:09:36 -0400
+
+verilator (3.877-1connectal1) precise; urgency=medium
 
   * Fixes issue 467, adding more old-style $display options
 
