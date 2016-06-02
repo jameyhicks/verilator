@@ -20,6 +20,7 @@
 
 #include "config_build.h"
 #include "verilatedos.h"
+#include <string.h>
 #include <cmath>
 #include <cstdio>
 #include <cstdarg>

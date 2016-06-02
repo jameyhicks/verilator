@@ -22,6 +22,7 @@
 #define _V3ERROR_H_ 1
 #include "config_build.h"
 #include "verilatedos.h"
+#include <stdlib.h>
 #include <string>
 #include <iostream>
 #include <sstream>

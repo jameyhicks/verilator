@@ -26,6 +26,7 @@
 #include "V3FileLine.h"
 #include "V3Number.h"
 #include "V3Global.h"
+#include <string.h>
 #include <vector>
 #include <cmath>
 #include <map>

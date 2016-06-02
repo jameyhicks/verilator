@@ -23,6 +23,7 @@
 
 #include "config_build.h"
 #include "verilatedos.h"
+#include <stdio.h>
 #include <string>
 
 #include "V3Error.h"
