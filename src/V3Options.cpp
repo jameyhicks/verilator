@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -20,6 +20,7 @@
 
 #include "config_build.h"
 #include "verilatedos.h"
+#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifndef _WIN32
@@ -128,6 +129,52 @@ void V3Options::addDefine(const string& defline, bool allowPlus) {
 	    def.erase(pos);
 	}
 	V3PreShell::defineCmdLine(def,value);
+    }
+}
+void V3Options::addParameter(const string& paramline, bool allowPlus) {
+    // Split +define+foo=value into the appropriate parts and parse
+    // Optional + says to allow multiple defines on the line
+    // + is not quotable, as other simulators do not allow that
+    string left = paramline;
+    while (left != "") {
+        string param = left;
+        string::size_type pos;
+        if (allowPlus && ((pos=left.find("+")) != string::npos)) {
+            left = left.substr(pos+1);
+            param.erase(pos);
+        } else {
+            left = "";
+        }
+        string value;
+        if ((pos=param.find("=")) != string::npos) {
+            value = param.substr(pos+1);
+            param.erase(pos);
+        }
+        UINFO(4,"Add parameter"<<param<<"="<<value<<endl);
+        (void)m_parameters.erase(param);
+        m_parameters[param] = value;
+    }
+}
+
+bool V3Options::hasParameter(string name) {
+    return m_parameters.find(name) != m_parameters.end();
+}
+
+string V3Options::parameter(string name) {
+    string value = m_parameters.find(name)->second;
+    m_parameters.erase(m_parameters.find(name));
+    return value;
+}
+
+void V3Options::checkParameters() {
+    if (!m_parameters.empty()) {
+        stringstream msg;
+        msg << "Parameters from the command line were not found in the design:";
+        for (map<string,string>::iterator it = m_parameters.begin();
+                it != m_parameters.end(); ++it) {
+            msg << " " << it->first;
+        }
+        v3fatal(msg.str()<<endl);
     }
 }
 
@@ -563,9 +610,9 @@ bool V3Options::onoff(const char* sw, const char* arg, bool& flag) {
     return false;
 }
 
-bool V3Options::suffixed(const char* sw, const char* arg) {
-    if (strlen(arg) > strlen(sw)) return false;
-    return (0==strcmp(sw+strlen(sw)-strlen(arg), arg));
+bool V3Options::suffixed(const string& sw, const char* arg) {
+    if (strlen(arg) > sw.length()) return false;
+    return (0==strcmp(sw.c_str()+sw.length()-strlen(arg), arg));
 }
 
 void V3Options::parseOptsList(FileLine* fl, const string& optdir, int argc, char** argv) {
@@ -647,7 +694,6 @@ void V3Options::parseOptsList(FileLine* fl, const string& optdir, int argc, char
 	    else if ( onoff   (sw, "-exe", flag/*ref*/) )	{ m_exe = flag; }
 	    else if ( onoff   (sw, "-ignc", flag/*ref*/) )	{ m_ignc = flag; }
 	    else if ( onoff   (sw, "-inhibit-sim", flag/*ref*/)){ m_inhibitSim = flag; }
-	    else if ( onoff   (sw, "-l2name", flag/*ref*/) )	{ m_l2Name = flag; }
 	    else if ( onoff   (sw, "-lint-only", flag/*ref*/) )	{ m_lintOnly = flag; }
 	    else if ( !strcmp (sw, "-no-pins64") )		{ m_pinsBv = 33; }
 	    else if ( onoff   (sw, "-order-clock-delay", flag/*ref*/) )	{ m_orderClockDly = flag; }
@@ -658,6 +704,7 @@ void V3Options::parseOptsList(FileLine* fl, const string& optdir, int argc, char
 	    else if ( !strcmp (sw, "-private") )		{ m_public = false; }
 	    else if ( onoff   (sw, "-profile-cfuncs", flag/*ref*/) )	{ m_profileCFuncs = flag; }
 	    else if ( onoff   (sw, "-public", flag/*ref*/) )		{ m_public = flag; }
+            else if ( !strncmp(sw, "-pvalue+", strlen("-pvalue+")))	{ addParameter(string(sw+strlen("-pvalue+")), false); }
 	    else if ( onoff   (sw, "-report-unoptflat", flag/*ref*/) )	{ m_reportUnoptflat = flag; }
 	    else if ( onoff   (sw, "-savable", flag/*ref*/) )		{ m_savable = flag; }
 	    else if ( !strcmp (sw, "-sc") )				{ m_outFormatOk = true; m_systemC = true; m_systemPerl = false; }
@@ -748,6 +795,9 @@ void V3Options::parseOptsList(FileLine* fl, const string& optdir, int argc, char
 		shift;
 		V3Error::errorLimit(atoi(argv[i]));
 	    }
+	    else if ( !strncmp (sw, "-G", strlen("-G"))) {
+		addParameter (string (sw+strlen("-G")), false);
+	    }
 	    else if ( !strncmp (sw, "-I", 2)) {
 		addIncDirUser (parseFileArg(optdir, string (sw+strlen("-I"))));
 	    }
@@ -762,6 +812,16 @@ void V3Options::parseOptsList(FileLine* fl, const string& optdir, int argc, char
 	    else if ( !strcmp (sw, "-LDFLAGS") && (i+1)<argc ) {
 		shift;
 		addLdLibs(argv[i]);
+	    }
+	    else if ( !strcmp (sw, "-l2-name") && (i+1)<argc ) {
+		shift;
+		m_l2Name = argv[i];
+	    }
+	    else if ( !strcmp (sw, "-l2name")) {  // Historical and undocumented
+		m_l2Name = "v";
+	    }
+	    else if ( !strcmp (sw, "-no-l2name")) {  // Historical and undocumented
+		m_l2Name = "";
 	    }
 	    else if ( (!strcmp (sw, "-language") && (i+1)<argc)
 		      || (!strcmp (sw, "-default-language") && (i+1)<argc)) {
@@ -962,16 +1022,16 @@ void V3Options::parseOptsList(FileLine* fl, const string& optdir, int argc, char
 	else {
 	    // Filename
 	    string filename = parseFileArg(optdir,argv[i]);
-	    if (suffixed(filename.c_str(), ".cpp")
-		|| suffixed(filename.c_str(), ".cxx")
-		|| suffixed(filename.c_str(), ".cc")
-		|| suffixed(filename.c_str(), ".c")
-		|| suffixed(filename.c_str(), ".sp")) {
+	    if (suffixed(filename, ".cpp")
+		|| suffixed(filename, ".cxx")
+		|| suffixed(filename, ".cc")
+		|| suffixed(filename, ".c")
+		|| suffixed(filename, ".sp")) {
 		V3Options::addCppFile(filename);
 	    }
-	    else if (suffixed(filename.c_str(), ".a")
-		     || suffixed(filename.c_str(), ".o")
-		     || suffixed(filename.c_str(), ".so")) {
+	    else if (suffixed(filename, ".a")
+		     || suffixed(filename, ".o")
+		     || suffixed(filename, ".so")) {
 		V3Options::addLdLibs(filename);
 	    }
 	    else {
@@ -1092,7 +1152,7 @@ void V3Options::showVersion(bool verbose) {
     if (!verbose) return;
 
     cout <<endl;
-    cout << "Copyright 2003-2015 by Wilson Snyder.  Verilator is free software; you can\n";
+    cout << "Copyright 2003-2016 by Wilson Snyder.  Verilator is free software; you can\n";
     cout << "redistribute it and/or modify the Verilator internals under the terms of\n";
     cout << "either the GNU Lesser General Public License Version 3 or the Perl Artistic\n";
     cout << "License Version 2.0.\n";
@@ -1142,7 +1202,6 @@ V3Options::V3Options() {
     m_exe = false;
     m_ignc = false;
     m_inhibitSim = false;
-    m_l2Name = true;
     m_lintOnly = false;
     m_makeDepend = true;
     m_makePhony = false;
@@ -1192,6 +1251,7 @@ V3Options::V3Options() {
     m_makeDir = "obj_dir";
     m_bin = "";
     m_flags = "";
+    m_l2Name = "";
     m_unusedRegexp = "*unused*";
     m_xAssign = "fast";
 

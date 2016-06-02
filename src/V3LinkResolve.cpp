@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -38,6 +38,7 @@
 #include <vector>
 
 #include "V3Global.h"
+#include "V3String.h"
 #include "V3LinkResolve.h"
 #include "V3Ast.h"
 
@@ -204,7 +205,7 @@ private:
 	    if (AstNodeVarRef* varrefp = basefromp->castNodeVarRef()) {  // Maybe varxref - so need to clone
 		nodep->attrp(new AstAttrOf(nodep->fileline(), AstAttrType::VAR_BASE,
 					   varrefp->cloneTree(false)));
-	    } else if (AstUnlinkedVarXRef* uvxrp = basefromp->castUnlinkedVarXRef()) {  // Maybe varxref - so need to clone
+	    } else if (AstUnlinkedRef* uvxrp = basefromp->castUnlinkedRef()) {  // Maybe unlinked - so need to clone
 		nodep->attrp(new AstAttrOf(nodep->fileline(), AstAttrType::VAR_BASE,
 					   uvxrp->cloneTree(false)));
 	    } else if (AstMemberSel* fromp = basefromp->castMemberSel()) {
@@ -255,23 +256,29 @@ private:
     }
 
     string expectFormat(AstNode* nodep, const string& format, AstNode* argp, bool isScan) {
-	// Check display arguments
+	// Check display arguments, return new format string
+	string newFormat;
 	bool inPct = false;
+	string fmt = "";
 	for (string::const_iterator it = format.begin(); it != format.end(); ++it) {
-	    char ch = tolower(*it);
+	    char ch = *it;
 	    if (!inPct && ch=='%') {
 		inPct = true;
+		fmt = ch;
+	    } else if (inPct && (isdigit(ch) || ch=='.')) {
+		fmt += ch;
 	    } else if (inPct) {
 		inPct = false;
+		fmt += ch;
 		switch (tolower(ch)) {
-		case '0': case '1': case '2': case '3': case '4':
-		case '5': case '6': case '7': case '8': case '9':
-		case '.':
-		    inPct = true;
+		case '%':  // %% - just output a %
 		    break;
-		case '%': break;  // %% - just output a %
 		case 'm':  // %m - auto insert "name"
-		    if (isScan) nodep->v3error("Unsupported: %m in $fscanf");
+		    if (isScan) { nodep->v3error("Unsupported: %m in $fscanf"); fmt = ""; }
+		    break;
+		case 'l':  // %l - auto insert "library"
+		    if (isScan) { nodep->v3error("Unsupported: %l in $fscanf"); fmt = ""; }
+		    if (m_modp) fmt = VString::quotePercent(m_modp->prettyName());
 		    break;
 		default:  // Most operators, just move to next argument
 		    if (!V3Number::displayedFmtLegal(ch)) {
@@ -285,11 +292,14 @@ private:
 		    }
 		    break;
 		} // switch
+		newFormat += fmt;
+	    } else {
+		newFormat += ch;
 	    }
 	}
+
 	if (argp && !isScan) {
 	    int skipCount = 0; // number of args consume by any additional format strings
-	    string newFormat(format);
 	    while (argp) {
 		if (skipCount) {
 		    argp = argp->nextp();
@@ -303,13 +313,9 @@ private:
 		    string str(numchars, ' ');
 		    // now scan for % operators
 		    bool inpercent = false;
-		    int numwords = (numchars+3)/4;
 		    for (int i = 0; i < numchars; i++) {
 			int ii = numchars - i - 1;
-			int w = ii / 4;
-			int j = ii % 4;
-			uint32_t dataword = constp->num().dataWord(w);
-			char c = (dataword >> (8*j)) & 0xff;
+			char c = constp->num().dataByte(ii);
 			str[i] = c;
 			if (!inpercent && c == '%') {
 			    inpercent = true;
@@ -324,24 +330,23 @@ private:
 			    case '%':
 				break;
 			    default:
-				if (V3Number::displayedFmtLegal(c))
+				if (V3Number::displayedFmtLegal(c)) {
 				    skipCount++;
+				}
 			    }
 			}
 		    }
 		    newFormat.append(str);
 		    AstNode *nextp = argp->nextp();
-		    argp->unlinkFrBack(); //FIXME: pushDeletep(nodep); VL_DANGLING(nodep);
+		    argp->unlinkFrBack(); pushDeletep(argp); VL_DANGLING(argp);
 		    argp = nextp;
 		} else {
 		    newFormat.append("%h");
 		    argp = argp->nextp();
 		}
 	    }
-	    return newFormat;
-	} else {
-	    return string();
 	}
+	return newFormat;
     }
 
     void expectDescriptor(AstNode* nodep, AstNodeVarRef* filep) {
@@ -371,10 +376,8 @@ private:
     }
     virtual void visit(AstSFormatF* nodep, AstNUser*) {
 	nodep->iterateChildren(*this);
-	string newFormat = 
-	    expectFormat(nodep, nodep->text(), nodep->exprsp(), false);
-	if (newFormat.size())
-	    nodep->text(newFormat);
+	string newFormat = expectFormat(nodep, nodep->text(), nodep->exprsp(), false);
+	nodep->text(newFormat);
 	if ((nodep->backp()->castDisplay() && nodep->backp()->castDisplay()->displayType().needScopeTracking())
 	    || nodep->formatScopeTracking()) {
 	    nodep->scopeNamep(new AstScopeName(nodep->fileline()));

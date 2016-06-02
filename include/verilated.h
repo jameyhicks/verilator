@@ -1,7 +1,7 @@
 // -*- mode: C++; c-file-style: "cc-mode" -*-
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder. This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder. This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License.
 // Version 2.0.
@@ -201,16 +201,16 @@ public:  // But internals only - called from VerilatedModule's
     inline VerilatedSyms* symsp() const { return m_symsp; }
     VerilatedVar* varFind(const char* namep) const;
     VerilatedVarNameMap* varsp() const { return m_varsp; }
-    void* exportFindError(int funcnum) const;
-    void* exportFindNullError(int funcnum) const;
     void scopeDump() const;
-    inline void* exportFind(int funcnum) const {
-	if (VL_UNLIKELY(!this)) return exportFindNullError(funcnum);
-	if (VL_LIKELY(funcnum < m_funcnumMax)) {
+    void* exportFindError(int funcnum) const;
+    static void* exportFindNullError(int funcnum);
+    static inline void* exportFind(const VerilatedScope* scopep, int funcnum) {
+	if (VL_UNLIKELY(!scopep)) return exportFindNullError(funcnum);
+	if (VL_LIKELY(funcnum < scopep->m_funcnumMax)) {
 	    // m_callbacksp must be declared, as Max'es are > 0
-	    return m_callbacksp[funcnum];
+	    return scopep->m_callbacksp[funcnum];
 	} else {
-	    return exportFindError(funcnum);
+	    return scopep->exportFindError(funcnum);
 	}
     }
 };
@@ -288,7 +288,9 @@ public:
     /// Record command line arguments, for retrieval by $test$plusargs/$value$plusargs
     static void commandArgs(int argc, const char** argv);
     static void commandArgs(int argc, char** argv) { commandArgs(argc,(const char**)argv); }
+    static void commandArgsAdd(int argc, const char** argv);
     static CommandArgValues* getCommandArgs() {return &s_args;}
+    /// Match plusargs with a given prefix. Returns static char* valid only for a single call
     static const char* commandArgsPlusMatch(const char* prefixp);
 
     /// Produce name & version for (at least) VPI

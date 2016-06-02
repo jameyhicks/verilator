@@ -3,7 +3,92 @@ Revision history for Verilator
 The contributors that suggested a given feature are shown in [].  [by ...]
 indicates the contributor was also the author of the fix; Thanks!
 
-* Verilator 3.877 devel
+
+* Verilator 3.884 2016-05-18
+
+**    Support parameter type, bug376. [Alan Hunter, et al]
+
+**    Support command-line -G/+pvalue param overrides, bug1045. [Stefan Wallentowitz]
+
+***   The default l2 scope name is now the same as the top-level module, bug1050.
+      Use "--l2-name v" for the historical behavior.
+
+***   Add --l2-name option for controlling "v" naming.
+
+****  Fix --output-split of constructors, bug1035. [Johan Bjork]
+
+****  Fix removal of empty packages, modules and cells, bug1034. [Johan Bjork]
+
+****  Fix core dump on Arch Linux/GCC 6.1.1, bug1058. [Jannis Harder]
+
+****  Fix $value$plusargs to string, msg1890. [Frederic Requin]
+
+
+* Verilator 3.882 2016-03-01
+
+****  Internal Verilation-time performance enhancements, bug1021. [Johan Bjork]
+
+****  Support inlining interfaces, bug1018. [Johan Bjork]
+
+****  Support SV strings to readmemh, bug1040. [Stefan Wallentowitz]
+
+****  Fix unrolling complicated for-loop bounds, bug677. [Johan Bjork]
+
+****  Fix stats file containing multiple unroll entries, bug1020. [Johan Bjork]
+
+****  Fix using short parameter names on negative params, bug1022. [Duraid Madina]
+
+****  Fix read-after-free error, bug1031. [Johan Bjork]
+
+****  Fix elaboration-time display warnings, bug1032. [Johan Bjork]
+
+****  Fix crash on very deep function trees, bug1028. [Jonathan Kimmitt]
+
+****  Fix slicing mix of big and little-endian, bug1033. [Geoff Barrett]
+
+****  Fix pattern assignment width propagation, bug1037. [Johan Bjork]
+
+
+* Verilator 3.880 2015-12-19
+
+***   Support display %u, %v, %p, %z, bug989. [Johan Bjork]
+
+****  Fix real parameters causing bad module names, bug992. [Johan Bjork]
+
+****  Fix size-changing cast on packed struct, bug993. [Johan Bjork]
+
+****  Fix function calls on arrayed interface, bug994. [Johan Bjork]
+
+****  Fix arrayed interfaces, bug879, bug1001. [Todd Strader]
+
+****  Fix constant function assigned to packed structs, bug997. [Johan Bjork]
+
+****  Fix interface inside generate, bug998. [Johan Bjork]
+
+****  Fix $signed casts under generates, bug999. [Clifford Wolf]
+
+****  Fix genvar constant propagation, bug1003. [Johan Bjork]
+
+****  Fix parameter constant propagation from package, bug1004. [Johan Bjork]
+
+****  Fix array slicing of non-const indexes, bug1006. [Johan Bjork]
+
+****  Fix dotted generated array error, bug1005. [Jeff Bush, Johan Bjork]
+
+****  Fix error instead of warning on large concat, msg1768. [Paul Rolfe]
+
+****  Fix $bitstoreal constant propagation, bug1012. [Jonathan Kimmitt]
+
+****  Fix model restore crash, bug1013. [Jason McMullan]
+
+****  Fix arrayed instances to unpacked of same size, bug1015. [Varun Koyyalagunta]
+
+****  Fix slices of unpacked arrays with non-zero LSBs.
+
+****  Fix ternary operation with unpacked array, bug1017. [Varun Koyyalagunta].
+
+
+* Verilator 3.878 2015-11-01
 
 **    Add --vpi flag, and fix VPI linkage, bug969. [Arthur Kahlich]
 
@@ -13,7 +98,11 @@ indicates the contributor was also the author of the fix; Thanks!
 
 ***   Support elaboration assertions, bug973. [Johan Bjork]
 
+***   Support $display with non-format arguments, bug467. [Jamey Hicks]
+
 ****  Add VerilatedScopeNameMap for introspection, bug966. [Todd Strader]
+
+****  Ignore %l in $display, bug983. [Todd Strader]
 
 ****  Fix very long module names, bug937. [Todd Strader]
 
@@ -32,6 +121,10 @@ indicates the contributor was also the author of the fix; Thanks!
 ****  Fix struct.enum.name method calls, bug855. [Jonathon Donaldson]
 
 ****  Fix dot indexing into arrayed inferfaces, bug978.  [Johan Bjork]
+
+****  Fix crash in commandArgsPlusMatch, bug987. [Jamie Iles]
+
+****  Fix error message on missing interface, bug985. [Todd Strader]
 
 
 * Verilator 3.876 2015-08-12
@@ -2632,12 +2725,12 @@ of input ports exists for tracing.
 
 This uses outline mode in Emacs.  See C-h m [M-x describe-mode].
 
-Copyright 2001-2015 by Wilson Snyder.  This program is free software; you
+Copyright 2001-2016 by Wilson Snyder.  This program is free software; you
 can redistribute it and/or modify it under the terms of either the GNU
 Lesser General Public License Version 3 or the Perl Artistic License
 Version 2.0.
 
 Local variables:
 mode: outline
-paragraph-separate: "[ 	\f\n]*$"
+paragraph-separate: "[  \f\n]*$"
 end:

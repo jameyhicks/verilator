@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -58,6 +58,8 @@ class V3Options {
     V3StringList m_vFiles;	// argument: Verilog files to read
     DebugSrcMap m_debugSrcs;	// argument: --debugi-<srcfile>=<level>
     DebugSrcMap m_dumpTrees;	// argument: --dump-treei-<srcfile>=<level>
+    map<string,string>  m_parameters;   // Parameters
+
 
     bool	m_preprocOnly;	// main switch: -E
     bool	m_makeDepend;	// main switch: -MMD
@@ -76,7 +78,6 @@ class V3Options {
     bool	m_exe;		// main switch: --exe
     bool	m_ignc;		// main switch: --ignc
     bool	m_inhibitSim;	// main switch: --inhibit-sim
-    bool	m_l2Name;	// main switch: --l2name
     bool	m_lintOnly;	// main switch: --lint-only
     bool	m_orderClockDly;// main switch: --order-clock-delay
     bool	m_outFormatOk;	// main switch: --cc, --sc or --sp was specified
@@ -122,6 +123,7 @@ class V3Options {
     string	m_bin;		// main switch: --bin {binary}
     string	m_exeName;	// main switch: -o {name}
     string	m_flags;	// main switch: -f {name}
+    string	m_l2Name;	// main switch: --l2name; "" for top-module's name
     string	m_makeDir;	// main switch: -Mdir
     string	m_modPrefix;	// main switch: --mod-prefix
     string	m_pipeFilter;	// main switch: --pipe-filter
@@ -162,13 +164,14 @@ class V3Options {
     void addFuture(const string& flag);
     void addIncDirUser(const string& incdir);  // User requested
     void addIncDirFallback(const string& incdir);  // Low priority if not found otherwise
+    void addParameter(const string& paramline, bool allowPlus);
     void addLangExt(const string& langext, const V3LangCode& lc);
     void addLibExtV(const string& libext);
     void optimize(int level);
     void showVersion(bool verbose);
     void coverage(bool flag) { m_coverageLine = m_coverageToggle = m_coverageUser = flag; }
     bool onoff(const char* sw, const char* arg, bool& flag);
-    bool suffixed(const char* sw, const char* arg);
+    bool suffixed(const string& sw, const char* arg);
     string parseFileArg(const string& optdir, const string& relfilename);
     bool parseLangExt(const char* swp, const char* langswp, const V3LangCode& lc);
     string filePathCheckOneDir(const string& modname, const string& dirname);
@@ -237,7 +240,6 @@ class V3Options {
     bool pinsUint8() const { return m_pinsUint8; }
     bool profileCFuncs() const { return m_profileCFuncs; }
     bool allPublic() const { return m_public; }
-    bool l2Name() const { return m_l2Name; }
     bool lintOnly() const { return m_lintOnly; }
     bool ignc() const { return m_ignc; }
     bool inhibitSim() const { return m_inhibitSim; }
@@ -264,6 +266,7 @@ class V3Options {
     int    compLimitParens() const { return m_compLimitParens; }
 
     string exeName() const { return m_exeName!="" ? m_exeName : prefix(); }
+    string l2Name() const { return m_l2Name; }
     string makeDir() const { return m_makeDir; }
     string modPrefix() const { return m_modPrefix; }
     string pipeFilter() const { return m_pipeFilter; }
@@ -278,6 +281,10 @@ class V3Options {
     const V3StringSet& libraryFiles() const { return m_libraryFiles; }
     const V3StringList& vFiles() const { return m_vFiles; }
     const V3LangCode& defaultLanguage() const { return m_defaultLanguage; }
+
+    bool hasParameter(string name);
+    string parameter(string name);
+    void checkParameters();
 
     bool isFuture(const string& flag) const;
     bool isLibraryFile(const string& filename) const;

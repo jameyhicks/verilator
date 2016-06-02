@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -121,10 +121,13 @@ public:
     }
     AstPackage* unitPackage(FileLine* fl) {
 	// Find one made earlier?
-	AstPackage* pkgp = SYMP->symRootp()->findIdFlat(AstPackage::dollarUnitName())->nodep()->castPackage();
-	if (!pkgp) {
+	VSymEnt* symp = SYMP->symRootp()->findIdFlat(AstPackage::dollarUnitName());
+	AstPackage* pkgp;
+	if (!symp) {
 	    pkgp = PARSEP->rootp()->dollarUnitPkgAddp();
 	    SYMP->reinsert(pkgp, SYMP->symRootp());  // Don't push/pop scope as they're global
+	} else {
+	    pkgp = symp->nodep()->castPackage(); 
 	}
 	return pkgp;
     }
@@ -418,6 +421,7 @@ class AstSenTree;
 %token<fl>		yTRI0		"tri0"
 %token<fl>		yTRI1		"tri1"
 %token<fl>		yTRUE		"true"
+%token<fl>		yTYPE		"type"
 %token<fl>		yTYPEDEF	"typedef"
 %token<fl>		yUNION		"union"
 %token<fl>		yUNIQUE		"unique"
@@ -802,7 +806,7 @@ udpFront<modulep>:
 
 parameter_value_assignmentE<pinp>:	// IEEE: [ parameter_value_assignment ]
 		/* empty */				{ $$ = NULL; }
-	|	'#' '(' cellpinList ')'			{ $$ = $3; }
+	|	'#' '(' cellparamList ')'		{ $$ = $3; }
 	//			// Parentheses are optional around a single parameter
 	|	'#' yaINTNUM				{ $$ = new AstPin($1,1,"",new AstConst($1,*$2)); }
 	|	'#' yaFLOATNUM				{ $$ = new AstPin($1,1,"",new AstConst($1,AstConst::Unsized32(),(int)(($2<0)?($2-0.5):($2+0.5)))); }
@@ -1120,6 +1124,7 @@ genvar_identifierDecl<varp>:		// IEEE: genvar_identifier (for declaration)
 
 local_parameter_declaration<nodep>:	// IEEE: local_parameter_declaration
 	//			// See notes in parameter_declaration
+	//			// Front must execute first so VARDTYPE is ready before list of vars
 		local_parameter_declarationFront list_of_param_assignments	{ $$ = $2; }
 	;
 
@@ -1128,30 +1133,33 @@ parameter_declaration<nodep>:	// IEEE: parameter_declaration
 	//			// Instead of list_of_type_assignments
 	//			// we use list_of_param_assignments because for port handling
 	//			// it already must accept types, so simpler to have code only one place
+	//			// Front must execute first so VARDTYPE is ready before list of vars
 		parameter_declarationFront list_of_param_assignments	{ $$ = $2; }
 	;
 
 local_parameter_declarationFront: // IEEE: local_parameter_declaration w/o assignment
+	//			// Front must execute first so VARDTYPE is ready before list of vars
 		varLParamReset implicit_typeE 		{ /*VARRESET-in-varLParam*/ VARDTYPE($2); }
 	|	varLParamReset data_type		{ /*VARRESET-in-varLParam*/ VARDTYPE($2); }
-	//UNSUP	varLParamReset yTYPE			{ /*VARRESET-in-varLParam*/ VARDTYPE($2); }
+	|	varLParamReset yTYPE			{ /*VARRESET-in-varLParam*/ VARDTYPE(new AstParseTypeDType($2)); }
 	;
 
 parameter_declarationFront:	// IEEE: parameter_declaration w/o assignment
+	//			// Front must execute first so VARDTYPE is ready before list of vars
 		varGParamReset implicit_typeE 		{ /*VARRESET-in-varGParam*/ VARDTYPE($2); }
 	|	varGParamReset data_type		{ /*VARRESET-in-varGParam*/ VARDTYPE($2); }
-	//UNSUP	varGParamReset yTYPE			{ /*VARRESET-in-varGParam*/ VARDTYPE($2); }
+	|	varGParamReset yTYPE			{ /*VARRESET-in-varGParam*/ VARDTYPE(new AstParseTypeDType($2)); }
 	;
 
 parameter_port_declarationFrontE: // IEEE: parameter_port_declaration w/o assignment
 	//			// IEEE: parameter_declaration (minus assignment)
+	//			// Front must execute first so VARDTYPE is ready before list of vars
 		varGParamReset implicit_typeE 		{ /*VARRESET-in-varGParam*/ VARDTYPE($2); }
 	|	varGParamReset data_type		{ /*VARRESET-in-varGParam*/ VARDTYPE($2); }
+	|	varGParamReset yTYPE			{ /*VARRESET-in-varGParam*/ VARDTYPE(new AstParseTypeDType($2)); }
 	|	implicit_typeE 				{ /*VARRESET-in-varGParam*/ VARDTYPE($1); }
 	|	data_type				{ /*VARRESET-in-varGParam*/ VARDTYPE($1); }
-	//UNSUP	varGParamReset yTYPE			{ /*VARRESET-in-varGParam*/ VARDTYPE($2); }
-	//UNSUP	data_type				{ VARDTYPE($1); }
-	//UNSUP	yTYPE 					{ VARDTYPE($1); }
+	|	yTYPE					{ /*VARRESET-in-varGParam*/ VARDTYPE(new AstParseTypeDType($1)); }
 	;
 
 net_declaration<nodep>:		// IEEE: net_declaration - excluding implict
@@ -1985,9 +1993,9 @@ packed_dimension<rangep>:	// ==IEEE: packed_dimension
 param_assignment<varp>:		// ==IEEE: param_assignment
 	//			// IEEE: constant_param_expression
 	//			// constant_param_expression: '$' is in expr
-		id/*new-parameter*/ variable_dimensionListE sigAttrListE '=' expr
+	//			// note exptOrDataType being a data_type is only for yPARAMETER yTYPE
+		id/*new-parameter*/ variable_dimensionListE sigAttrListE '=' exprOrDataType
 	/**/		{ $$ = VARDONEA($<fl>1,*$1, $2, $3); $$->valuep($5); }
-	//UNSUP:  exprOrDataType instead of expr
 	;
 
 list_of_param_assignments<varp>:	// ==IEEE: list_of_param_assignments
@@ -2060,20 +2068,29 @@ instnameParen<cellp>:
 
 instRangeE<rangep>:
 		/* empty */				{ $$ = NULL; }
-	|	'[' constExpr ']'			{ $$ = new AstRange($1,$2,$2->cloneTree(true)); }
+	|	'[' constExpr ']'			{ $$ = new AstRange($1,new AstConst($1,0),$2); }
 	|	'[' constExpr ':' constExpr ']'		{ $$ = new AstRange($1,$2,$4); }
+	;
+
+cellparamList<pinp>:
+		{VARRESET_LIST(UNKNOWN);} cellparamItList	{ $$ = $2; VARRESET_NONLIST(UNKNOWN); }
 	;
 
 cellpinList<pinp>:
 		{VARRESET_LIST(UNKNOWN);} cellpinItList	{ $$ = $2; VARRESET_NONLIST(UNKNOWN); }
 	;
 
-cellpinItList<pinp>:		// IEEE: list_of_port_connections + list_of_parameter_assignmente
+cellparamItList<pinp>:		// IEEE: list_of_parameter_assignmente
+		cellparamItemE				{ $$ = $1; }
+	|	cellparamItList ',' cellparamItemE	{ $$ = $1->addNextNull($3)->castPin(); }
+	;
+
+cellpinItList<pinp>:		// IEEE: list_of_port_connections
 		cellpinItemE				{ $$ = $1; }
 	|	cellpinItList ',' cellpinItemE		{ $$ = $1->addNextNull($3)->castPin(); }
 	;
 
-cellpinItemE<pinp>:		// IEEE: named_port_connection + named_parameter_assignment + empty
+cellparamItemE<pinp>:		// IEEE: named_parameter_assignment + empty
 				// Note empty can match either () or (,); V3LinkCells cleans up ()
 		/* empty: ',,' is legal */		{ $$ = new AstPin(CRELINE(),PINNUMINC(),"",NULL); }
 	|	yP_DOTSTAR				{ $$ = new AstPin($1,PINNUMINC(),".*",NULL); }
@@ -2085,9 +2102,26 @@ cellpinItemE<pinp>:		// IEEE: named_port_connection + named_parameter_assignment
 	//UNSUP	'.' idAny '(' expr ':' expr ')'		{ }
 	//UNSUP	'.' idAny '(' expr ':' expr ':' expr ')' { }
 	//			// For parameters
-	//UNSUP	'.' idAny '(' data_type ')'		{ PINDONE($1,$2,$4);  GRAMMARP->pinNumInc(); }
+	|	'.' idAny '(' data_type ')'		{ $$ = new AstPin($1,PINNUMINC(),*$2,$4); }
 	//			// For parameters
-	//UNSUP	data_type				{ PINDONE($1->fileline(),"",$1);  GRAMMARP->pinNumInc(); }
+	|	data_type				{ $$ = new AstPin($1->fileline(),PINNUMINC(),"",$1); }
+	//
+	|	expr					{ $$ = new AstPin($1->fileline(),PINNUMINC(),"",$1); }
+	//UNSUP	expr ':' expr				{ }
+	//UNSUP	expr ':' expr ':' expr			{ }
+	;
+
+cellpinItemE<pinp>:		// IEEE: named_port_connection + empty
+				// Note empty can match either () or (,); V3LinkCells cleans up ()
+		/* empty: ',,' is legal */		{ $$ = new AstPin(CRELINE(),PINNUMINC(),"",NULL); }
+	|	yP_DOTSTAR				{ $$ = new AstPin($1,PINNUMINC(),".*",NULL); }
+	|	'.' idSVKwd				{ $$ = new AstPin($1,PINNUMINC(),*$2,new AstVarRef($1,*$2,false)); $$->svImplicit(true);}
+	|	'.' idAny				{ $$ = new AstPin($1,PINNUMINC(),*$2,new AstVarRef($1,*$2,false)); $$->svImplicit(true);}
+	|	'.' idAny '(' ')'			{ $$ = new AstPin($1,PINNUMINC(),*$2,NULL); }
+	//			// mintypmax is expanded here, as it might be a UDP or gate primitive
+	|	'.' idAny '(' expr ')'			{ $$ = new AstPin($1,PINNUMINC(),*$2,$4); }
+	//UNSUP	'.' idAny '(' expr ':' expr ')'		{ }
+	//UNSUP	'.' idAny '(' expr ':' expr ':' expr ')' { }
 	//
 	|	expr					{ $$ = new AstPin($1->fileline(),PINNUMINC(),"",$1); }
 	//UNSUP	expr ':' expr				{ }
@@ -2669,6 +2703,12 @@ system_f_call<nodep>:		// IEEE: system_tf_call (as func)
 	|	yD_UNPACKED_DIMENSIONS '(' expr ')'	{ $$ = new AstAttrOf($1,AstAttrType::DIM_UNPK_DIMENSIONS,$3); }
 	|	yD_UNSIGNED '(' expr ')'		{ $$ = new AstUnsigned($1,$3); }
 	|	yD_VALUEPLUSARGS '(' str ',' expr ')'	{ $$ = new AstValuePlusArgs($1,*$3,$5); }
+	;
+
+exprOrDataType<nodep>:		// expr | data_type: combined to prevent conflicts
+		expr					{ $$ = $1; }
+	//			// data_type includes id that overlaps expr, so special flavor
+	|	data_type				{ $$ = $1; }
 	;
 
 list_of_argumentsE<nodep>:	// IEEE: [list_of_arguments]
@@ -3689,8 +3729,7 @@ void V3ParseGrammar::argWrapList(AstNodeFTaskRef* nodep) {
     while (nodep->pinsp()) {
 	AstNode* exprp = nodep->pinsp()->unlinkFrBack();
 	// addNext can handle nulls:
-	// cppcheck-suppress nullPointer
-	outp = outp->addNext(new AstArg(exprp->fileline(), "", exprp));
+	outp = AstNode::addNext(outp, new AstArg(exprp->fileline(), "", exprp));
     }
     if (outp) nodep->addPinsp(outp);
 }
@@ -3735,9 +3774,6 @@ AstVar* V3ParseGrammar::createVariable(FileLine* fileline, string name, AstRange
 	return NULL;
     }
     AstVarType type = GRAMMARP->m_varIO;
-    if (dtypep->castIfaceRefDType()) {
-	if (arrayp) { fileline->v3error("Unsupported: Arrayed interfaces"); VL_DANGLING(arrayp); }
-    }
     if (!dtypep) {  // Created implicitly
 	dtypep = new AstBasicDType(fileline, LOGIC_IMPLICIT);
     } else {  // May make new variables with same type, so clone
@@ -3766,6 +3802,12 @@ AstVar* V3ParseGrammar::createVariable(FileLine* fileline, string name, AstRange
     if (GRAMMARP->m_varDecl == AstVarType::SUPPLY1) {
 	nodep->addNext(V3ParseGrammar::createSupplyExpr(fileline, nodep->name(), 1));
     }
+    if (dtypep->castParseTypeDType()) {
+	// Parser needs to know what is a type
+	AstNode* newp = new AstTypedefFwd(fileline, name);
+	nodep->addNext(newp);
+	SYMP->reinsert(newp);
+    }
     // Don't set dtypep in the ranging;
     // We need to autosize parameters and integers separately
     //
@@ -3786,7 +3828,7 @@ string V3ParseGrammar::deQuote(FileLine* fileline, string text) {
     string newtext;
     unsigned char octal_val = 0;
     int octal_digits = 0;
-    for (const char* cp=text.c_str(); *cp; ++cp) {
+    for (string::const_iterator cp=text.begin(); cp!=text.end(); ++cp) {
 	if (quoted) {
 	    if (isdigit(*cp)) {
 		octal_val = octal_val*8 + (*cp-'0');

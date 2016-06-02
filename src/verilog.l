@@ -6,7 +6,7 @@
  *
  **************************************************************************
  *
- * Copyright 2003-2015 by Wilson Snyder.  Verilator is free software;
+ * Copyright 2003-2016 by Wilson Snyder.  Verilator is free software;
  * you can redistribute it and/or modify it under the terms of either the
  * GNU Lesser General Public License Version 3 or the Perl Artistic License
  * Version 2.0.
@@ -459,6 +459,7 @@ vnum	{vnum1}|{vnum2}|{vnum3}|{vnum4}|{vnum5}
   "struct"		{ FL; return ySTRUCT; }
   "timeprecision"	{ FL; return yTIMEPRECISION; }
   "timeunit"		{ FL; return yTIMEUNIT; }
+  "type"		{ FL; return yTYPE; }
   "typedef"		{ FL; return yTYPEDEF; }
   "union"		{ FL; return yUNION; }
   "unique"		{ FL; return yUNIQUE; }
@@ -508,7 +509,6 @@ vnum	{vnum1}|{vnum2}|{vnum3}|{vnum4}|{vnum5}
   "tagged"		{ yyerrorf("Unsupported: SystemVerilog 2005 reserved word not implemented: %s",yytext); }
   "this"		{ yyerrorf("Unsupported: SystemVerilog 2005 reserved word not implemented: %s",yytext); }
   "throughout"		{ yyerrorf("Unsupported: SystemVerilog 2005 reserved word not implemented: %s",yytext); }
-  "type"		{ yyerrorf("Unsupported: SystemVerilog 2005 reserved word not implemented: %s",yytext); }
   "virtual"		{ yyerrorf("Unsupported: SystemVerilog 2005 reserved word not implemented: %s",yytext); }
   "wait_order"		{ yyerrorf("Unsupported: SystemVerilog 2005 reserved word not implemented: %s",yytext); }
   "wildcard"		{ yyerrorf("Unsupported: SystemVerilog 2005 reserved word not implemented: %s",yytext); }
@@ -975,9 +975,10 @@ vnum	{vnum1}|{vnum2}|{vnum3}|{vnum4}|{vnum5}
 %%
 int V3ParseImp::stateVerilogRecent() { return STATE_VERILOG_RECENT; }
 
-double V3ParseImp::parseDouble(const char* textp, size_t length) {
+double V3ParseImp::parseDouble(const char* textp, size_t length, bool* successp) {
     char* strgp = new char[length+1];
     char* dp=strgp;
+    if (successp) *successp = true;
     for (const char* sp=textp; sp<(textp+length); ++sp) {
 	if (*sp != '_') *dp++ = *sp;
     }
@@ -985,7 +986,10 @@ double V3ParseImp::parseDouble(const char* textp, size_t length) {
     char* endp = strgp;
     double d = strtod(strgp, &endp);
     size_t parsed_len = endp-strgp;
-    if (parsed_len != strlen(strgp)) { yyerrorf("Syntax error parsing real: %s",strgp); }
+    if (parsed_len != strlen(strgp)) {
+        if (successp) *successp = false;
+        else yyerrorf("Syntax error parsing real: %s",strgp);
+    }
     delete[] strgp;
     return d;
 }
@@ -1030,19 +1034,20 @@ int V3ParseImp::lexToken() {
     // If an id, change the type based on symbol table
     // Note above sometimes converts yGLOBAL to a yaID__LEX
     if (token == yaID__LEX) {
-	AstNode* scp;
+	VSymEnt* foundp;
 	if (VSymEnt* look_underp = SYMP->nextId()) {
 	    if (debugFlex()) { cout<<"   lexToken: next id lookup forced under "<<look_underp<<endl; }
-	    scp = look_underp->findIdFallback(*(yylval.strp))->nodep();
+	    foundp = look_underp->findIdFallback(*(yylval.strp));
 	    // "consume" it.  Must set again if want another token under temp scope
 	    SYMP->nextId(NULL);
 	} else {
 	    UINFO(7,"   lexToken: find upward "<<SYMP->symCurrentp()<<" for '"<<*(yylval.strp)<<"'"<<endl);
 	    //if (debug()>=9) SYMP->symCurrentp()->dump(cout,"     -findtree: ",true);
-	    scp = SYMP->symCurrentp()->findIdFallback(*(yylval.strp))->nodep();
+	    foundp = SYMP->symCurrentp()->findIdFallback(*(yylval.strp));
 	}
-	yylval.scp = scp;
-	if (scp) {
+	if (foundp) {
+	    AstNode* scp = foundp->nodep();
+	    yylval.scp = scp;
 	    UINFO(7,"   lexToken: Found "<<scp<<endl);
 	    if (scp->castTypedef())		token = yaID__aTYPE;
 	    else if (scp->castTypedefFwd())	token = yaID__aTYPE;
@@ -1051,6 +1056,7 @@ int V3ParseImp::lexToken() {
 	    //UNSUP else if (scp->castCoverGroup()) 	token = yaID__aCOVERGROUP;
 	    else token = yaID__ETC;
 	} else {  // Not found
+	    yylval.scp = NULL;
 	    token = yaID__ETC;
 	}
     }

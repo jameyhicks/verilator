@@ -1013,7 +1013,8 @@ sub _run {
 	    if ($param{expect}) {
 		# Compare
 		my $quoted = quotemeta ($param{expect});
-		my $bad = ($wholefile !~ /$param{expect}/ms
+		my $bad = ($wholefile ne $param{expect}
+			   && $wholefile !~ /$param{expect}/ms
 			   && $wholefile !~ /$quoted/ms);
 		if ($bad) {
 		    #print "**BAD  $self->{name} $param{logfile} MT $moretry  $try\n";
@@ -1139,8 +1140,8 @@ sub _make_main {
 
     if ($self->{savable}) {
 	$fh->print("    const char* save_time_strp  = Verilated::commandArgsPlusMatch(\"save_time=\");\n");
-	$fh->print("    const char* save_restore_strp = Verilated::commandArgsPlusMatch(\"save_restore=\");\n");
 	$fh->print("    unsigned int save_time = !save_time_strp[0] ? 0 : atoi(save_time_strp+strlen(\"+save_time=\"));\n");
+	$fh->print("    const char* save_restore_strp = Verilated::commandArgsPlusMatch(\"save_restore=\");\n");
 	$fh->print("    unsigned int save_restore = !save_restore_strp[0] ? 0 : 1;\n");
     }
 
@@ -1977,7 +1978,7 @@ Command to use to invoke VCS.
 
 The latest version is available from L<http://www.veripool.org/>.
 
-Copyright 2003-2015 by Wilson Snyder.  Verilator is free software; you can
+Copyright 2003-2016 by Wilson Snyder.  Verilator is free software; you can
 redistribute it and/or modify it under the terms of either the GNU Lesser
 General Public License Version 3 or the Perl Artistic License Version 2.0.
 

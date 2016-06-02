@@ -3,6 +3,11 @@
 // This file ONLY is placed into the Public Domain, for any use,
 // without warranty, 2009 by Wilson Snyder.
 
+package testpackage;
+ localparam PARAM = 1024 >> 3;
+endpackage
+import testpackage::*;
+
 module t;
 
    localparam P4 = f_add(P3,1);
@@ -12,6 +17,20 @@ module t;
    localparam P18 = f_case(P4);
    localparam P6 = f_return(P4);
    localparam P3 = 3;
+   localparam P128 = f_package();
+
+   typedef struct packed {
+      logic [7:0] data;
+   } type_t;
+   typedef type_t [1:0] flist;
+   localparam flist PLIST = {8'd4,8'd8};
+   localparam flist PARR = f_list_swap_2(PLIST);
+   typedef struct packed {
+      logic first;
+      logic second;
+      logic [31:0] data;
+   } bigstruct_t;
+   localparam bigstruct_t bigparam = f_return_struct(1'b1, 1'b0, 32'hfff12fff);
 
    initial begin
 `ifdef TEST_VERBOSE
@@ -24,9 +43,19 @@ module t;
       if (P8 !== 8) $stop;
       if (P16 !== 16) $stop;
       if (P18 !== 18) $stop;
+      if (PARR[0] != PLIST[1]) $stop;
+      if (PARR[1] != PLIST[0]) $stop;
+      if (bigparam.first != 1'b1) $stop;
+      if (bigparam.second != 1'b0) $stop;
+      if (bigparam.data != 32'hfff12fff) $stop;
+      if (P128 != 128) $stop;
       $write("*-* All Finished *-*\n");
       $finish;
    end
+
+   function integer f_package();
+      return PARAM;
+   endfunction
 
    function integer f_add(input [31:0] a, input [31:0] b);
       f_add = a+b;
@@ -36,7 +65,7 @@ module t;
    function integer f_add2(input [31:0] a, input [31:0] b, input [31:0] c);
       f_add2 = f_add(a,b)+c;
    endfunction
-   
+
    // Speced ok: local variables
    function integer f_for(input [31:0] a);
       integer i;
@@ -83,5 +112,18 @@ module t;
 	 if (a>1) return 2+out;
       end
       f_return = 0;
+   endfunction
+
+   function flist f_list_swap_2(input flist in_list);
+      f_list_swap_2[0].data = in_list[1].data;
+      f_list_swap_2[1].data = in_list[0].data;
+   endfunction
+
+   function bigstruct_t f_return_struct(input first, input second, input [31:0] data);
+      bigstruct_t result;
+      result.data = data;
+      result.first = first;
+      result.second = second;
+      return result;
    endfunction
 endmodule

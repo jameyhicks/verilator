@@ -7,7 +7,7 @@
 #
 #*****************************************************************************
 #
-# Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+# Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 # redistribute it and/or modify it under the terms of either the GNU
 # Lesser General Public License Version 3 or the Perl Artistic License
 # Version 2.0.
@@ -99,6 +99,8 @@ CPPFLAGS += -MP # Only works on recent GCC versions
 ifeq ($(CFG_WITH_CCWARN),yes)	# Local... Else don't burden users
 CPPFLAGS += -W -Wall $(CFG_CXXFLAGS_SRC) -Werror
 #CPPFLAGS += -pedantic-errors
+else
+CPPFLAGS += $(CFG_CXXFLAGS_SRC)
 endif
 CPPFLAGSWALL   = $(CPPFLAGS)
 CPPFLAGSPARSER = $(CPPFLAGS) $(CFG_CXXFLAGS_PARSER)
@@ -235,6 +237,7 @@ RAW_OBJS = \
 	V3Undriven.o \
 	V3Unknown.o \
 	V3Unroll.o \
+	V3VarResets.o \
 	V3Width.o \
 	V3WidthSel.o \
 
@@ -326,6 +329,8 @@ V3PreLex_pregen.yy.cpp:	V3PreLex.l $(HEADERS)
 
 V3PreLex.yy.cpp: V3PreLex_pregen.yy.cpp $(FLEXFIX)
 	$(PERL) $(FLEXFIX) V3PreLex <$< >$@
+
+.SUFFIXES:
 
 ######################################################################
 ######################################################################

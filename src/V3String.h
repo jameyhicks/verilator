@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -35,6 +35,7 @@ public:
     // METHODS (generic string utilities)
     static bool wildmatch(const char* s, const char* p);
     static string downcase(const string& str);
+    static string quotePercent(const string& str);
 };
 
 //######################################################################

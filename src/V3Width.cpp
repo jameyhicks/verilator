@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -137,9 +137,7 @@ public:
     bool prelim() const { return m_stage & PRELIM; }
     bool final() const { return m_stage & FINAL; }
     void dump(ostream& str) const {
-	if (!this) {
-	    str<<"  VUP(NULL)";
-	} else if (!m_dtypep) {
+	if (!m_dtypep) {
 	    str<<"  VUP(s="<<m_stage<<",self)";
 	} else {
 	    str<<"  VUP(s="<<m_stage<<",dt="<<(void*)dtypep()<<")";
@@ -147,9 +145,29 @@ public:
     }
 };
 ostream& operator<<(ostream& str, const WidthVP* vup) {
-    vup->dump(str);
+    if (vup) vup->dump(str);
     return str;
 }
+
+//######################################################################
+
+class WidthClearVisitor {
+    // Rather than a AstNVisitor, can just quickly touch every node
+    void clearWidthRecurse(AstNode* nodep) {
+	nodep->didWidth(false);
+	if (nodep->op1p()) clearWidthRecurse(nodep->op1p());
+	if (nodep->op2p()) clearWidthRecurse(nodep->op2p());
+	if (nodep->op3p()) clearWidthRecurse(nodep->op3p());
+	if (nodep->op4p()) clearWidthRecurse(nodep->op4p());
+	if (nodep->nextp()) clearWidthRecurse(nodep->nextp());
+    }
+public:
+    // CONSTUCTORS
+    explicit WidthClearVisitor(AstNetlist* nodep) {
+	clearWidthRecurse(nodep);
+    }
+    virtual ~WidthClearVisitor() {}
+};
 
 //######################################################################
 
@@ -915,6 +933,9 @@ private:
 	    // calculation would return identical values.  Therefore we can directly replace the width
 	    nodep->widthForce(nodep->rangep()->elementsConst(), nodep->rangep()->elementsConst());
 	}
+	else if (nodep->isRanged()) {
+	    nodep->widthForce(nodep->nrange().elements(), nodep->nrange().elements());
+	}
 	else if (nodep->implicit()) {
 	    // Parameters may notice implicitness and change to different dtype
 	    nodep->widthForce(1,1);
@@ -952,6 +973,13 @@ private:
 	if (nodep->childDTypep()) nodep->dtypep(moveChildDTypeEdit(nodep));
 	nodep->iterateChildren(*this);
 	nodep->dtypep(iterateEditDTypep(nodep, nodep->subDTypep()));
+    }
+    virtual void visit(AstParamTypeDType* nodep, AstNUser*) {
+	if (nodep->didWidthAndSet()) return;  // This node is a dtype & not both PRELIMed+FINALed
+	if (nodep->childDTypep()) nodep->dtypep(moveChildDTypeEdit(nodep));
+	nodep->iterateChildren(*this);
+	nodep->dtypep(iterateEditDTypep(nodep, nodep->subDTypep()));
+	nodep->widthFromSub(nodep->subDTypep());
     }
     virtual void visit(AstCastParse* nodep, AstNUser* vup) {
 	// nodep->dtp could be data type, or a primary_constant
@@ -1017,6 +1045,9 @@ private:
 	    if (width < 1) { nodep->v3error("Size-changing cast to zero or negative size"); width=1; }
 	    nodep->lhsp()->iterateAndNext(*this,WidthVP(SELF,PRELIM).p());
 	    AstBasicDType* underDtp = nodep->lhsp()->dtypep()->castBasicDType();
+	    if (!underDtp) {
+		underDtp = nodep->lhsp()->dtypep()->basicp();
+	    }
 	    if (!underDtp) {
 		nodep->v3error("Unsupported: Size-changing cast on non-basic data type");
 		underDtp = nodep->findLogicBoolDType()->castBasicDType();
@@ -1156,7 +1187,7 @@ private:
 	// Note genvar's are also entered as integers
 	nodep->dtypeFrom(nodep->varp());
 	if (nodep->backp()->castNodeAssign() && nodep->lvalue()) {  // On LHS
-	    if (!nodep->widthMin()) v3fatalSrc("LHS var should be size complete");
+	    if (!nodep->widthMin()) nodep->v3fatalSrc("LHS var should be size complete");
 	}
 	//if (debug()>=9) nodep->dumpTree(cout,"  VRout ");
 	if (nodep->lvalue() && nodep->varp()->isConst()
@@ -1599,7 +1630,8 @@ private:
 			// Determine initial values
 			vdtypep = memp;
 			patp->dtypep(memp);
-			patp->accept(*this,WidthVP(memp,BOTH).p());
+			patp->accept(*this,WidthVP(memp,BOTH).p());  // See visit(AstPatMember*
+
 			// Convert to concat for now
 			AstNode* valuep = patp->lhssp()->unlinkFrBack();
 			if (valuep->castConst()) {
@@ -1652,8 +1684,8 @@ private:
 			vdtypep = arrayp->subDTypep();
 			// Don't want the RHS an array
 			patp->dtypep(vdtypep);
-		    // Determine values - might be another InitArray
-			patp->accept(*this,WidthVP(patp->dtypep(),BOTH).p());
+			// Determine values - might be another InitArray
+			patp->accept(*this,WidthVP(patp->dtypep(),BOTH).p());  // See visit(AstPatMember*
 			// Convert to InitArray or constify immediately
 			AstNode* valuep = patp->lhssp()->unlinkFrBack();
 			if (valuep->castConst()) {
@@ -1759,8 +1791,8 @@ private:
 	UINFO(9,"   PATMEMBER "<<nodep<<endl);
 	if (nodep->lhssp()->nextp()) nodep->v3fatalSrc("PatMember value should be singular w/replicates removed");
 	// Need to propagate assignment type downwards, even on prelim
-	nodep->iterateChildren(*this,WidthVP(nodep->dtypep(),BOTH).p());
-	iterateCheck(nodep,"Pattern value",nodep->lhssp(),CONTEXT,FINAL,vdtypep,EXTEND_LHS);
+	nodep->iterateChildren(*this,WidthVP(nodep->dtypep(),PRELIM).p());
+	iterateCheck(nodep,"Pattern value",nodep->lhssp(),ASSIGN,FINAL,vdtypep,EXTEND_LHS);
     }
     int visitPatMemberRep(AstPatMember* nodep) {
 	uint32_t times = 1;
@@ -1894,23 +1926,40 @@ private:
 	nodep->iterateChildren(*this,WidthVP(SELF,BOTH).p());
 	//
 	UINFO(9,"  Display in "<<nodep->text()<<endl);
-	string dispout = "";
+	string newFormat;
 	bool inPct = false;
 	AstNode* argp = nodep->exprsp();
 	string txt = nodep->text();
+	string fmt;
 	for (string::const_iterator it = txt.begin(); it!=txt.end(); ++it) {
 	    char ch = *it;
 	    if (!inPct && ch=='%') {
 		inPct = true;
-	    } else if (inPct && isdigit(ch)) {
+		fmt = ch;
+	    } else if (inPct && (isdigit(ch) || ch=='.')) {
+		fmt += ch;
 	    } else if (tolower(inPct)) {
 		inPct = false;
+		bool added = false;
 		switch (tolower(ch)) {
 		case '%': break;  // %% - just output a %
 		case 'm': break;  // %m - auto insert "name"
-		case 'd': {  // Convert decimal to either 'd' or 'u'
+		case 'l': break;  // %m - auto insert "library"
+		case 'd': {  // Convert decimal to either 'd' or '#'
 		    if (argp && argp->isSigned()) { // Convert it
 			ch = '~';
+		    }
+		    if (argp) argp=argp->nextp();
+		    break;
+		}
+		case 'p': {  // Packed
+		    // Very hacky and non-compliant; print strings as strings, otherwise as hex
+		    if (argp && argp->dtypep()->basicp()->isString()) { // Convert it
+			added = true;
+			newFormat += "\"%@\"";
+		    } else {
+			added = true;
+			newFormat += "'h%0h";
 		    }
 		    if (argp) argp=argp->nextp();
 		    break;
@@ -1927,10 +1976,15 @@ private:
 		    break;
 		}
 		} // switch
+		if (!added) {
+		    fmt += ch;
+		    newFormat += fmt;
+		}
+	    } else {
+		newFormat += ch;
 	    }
-	    dispout += ch;
 	}
-	nodep->text(dispout);
+	nodep->text(newFormat);
 	UINFO(9,"  Display out "<<nodep->text()<<endl);
     }
     virtual void visit(AstDisplay* nodep, AstNUser* vup) {
@@ -2220,8 +2274,7 @@ private:
 			    argp->unlinkFrBackWithNext(&handle);  // Format + additional args, if any
 			    AstNode* argsp = NULL;
 			    while (AstArg* nextargp = argp->nextp()->castArg()) {
-				// cppcheck-suppress nullPointer
-				argsp = argsp->addNext(nextargp->exprp()->unlinkFrBackWithNext()); // Expression goes to SFormatF
+				argsp = AstNode::addNext(argsp, nextargp->exprp()->unlinkFrBackWithNext()); // Expression goes to SFormatF
 				nextargp->unlinkFrBack()->deleteTree();  // Remove the call's Arg wrapper
 			    }
 			    string format;
@@ -2701,6 +2754,7 @@ private:
 	if (nodep->width()==0) nodep->v3fatalSrc("Under node "<<nodep->prettyTypeName()<<" has no expected width?? Missing Visitor func?");
 	if (expWidth==0) nodep->v3fatalSrc("Node "<<nodep->prettyTypeName()<<" has no expected width?? Missing Visitor func?");
 	if (expWidthMin==0) expWidthMin = expWidth;
+	if (nodep->dtypep()->width() == expWidth) return false;
 	if (nodep->dtypep()->widthSized()  && nodep->width() != expWidthMin) return true;
 	if (!nodep->dtypep()->widthSized() && nodep->widthMin() > expWidthMin) return true;
 	return false;
@@ -3505,6 +3559,7 @@ int V3Width::debug() {
 void V3Width::width(AstNetlist* nodep) {
     UINFO(2,__FUNCTION__<<": "<<endl);
     // We should do it in bottom-up module order, but it works in any order.
+    WidthClearVisitor cvisitor (nodep);
     WidthVisitor visitor (false, false);
     (void)visitor.mainAcceptEdit(nodep);
     WidthRemoveVisitor rvisitor;
@@ -3519,8 +3574,7 @@ AstNode* V3Width::widthParamsEdit (AstNode* nodep) {
     // We should do it in bottom-up module order, but it works in any order.
     WidthVisitor visitor (true, false);
     nodep = visitor.mainAcceptEdit(nodep);
-    WidthRemoveVisitor rvisitor;
-    nodep = rvisitor.mainAcceptEdit(nodep);
+    // No WidthRemoveVisitor, as don't want to drop $signed etc inside gen blocks
     return nodep;
 }
 
@@ -3539,8 +3593,7 @@ AstNode* V3Width::widthGenerateParamsEdit(
     // We should do it in bottom-up module order, but it works in any order.
     WidthVisitor visitor (true, true);
     nodep = visitor.mainAcceptEdit(nodep);
-    WidthRemoveVisitor rvisitor;
-    nodep = rvisitor.mainAcceptEdit(nodep);
+    // No WidthRemoveVisitor, as don't want to drop $signed etc inside gen blocks
     return nodep;
 }
 

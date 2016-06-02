@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -325,7 +325,7 @@ private:
 	}
     }
 
-    void visit(AstSel* nodep, AstNUser*) {
+    virtual void visit(AstSel* nodep, AstNUser*) {
 	nodep->iterateChildren(*this);
 	if (!nodep->user1SetOnce()) {
 	    // Guard against reading/writing past end of bit vector array

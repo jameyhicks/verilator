@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -171,7 +171,7 @@ public:
     // ACCESSORS
     string ascii(bool prefixed=true, bool cleanVerilog=false) const;
     static string quoteNameControls(const string& namein); // Add backslash quotes to strings
-    string displayed(const string& format) const;
+    string displayed(FileLine* fl, const string& format) const;
     static bool displayedFmtLegal(char format);  // Is this a valid format letter?
     int width() const { return m_width; }
     int widthMin() const;	// Minimum width that can represent this number (~== log2(num)+1)
@@ -205,6 +205,7 @@ public:
     double toDouble() const;
     uint32_t toHash() const;
     uint32_t dataWord(int word) const;
+    uint8_t dataByte(int byte) const { return (dataWord(byte/4) >> (8*(byte&3))) & 0xff; }
     uint32_t countOnes() const;
     uint32_t mostSetBitP1() const;	// Highest bit set plus one, IE for 16 return 5, for 0 return 0.
 

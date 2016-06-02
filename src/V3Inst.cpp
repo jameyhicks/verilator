@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -36,6 +36,7 @@
 #include "V3Inst.h"
 #include "V3Ast.h"
 #include "V3Changed.h"
+#include "V3Const.h"
 
 //######################################################################
 // Inst state, as a visitor of each AstNode
@@ -105,7 +106,9 @@ private:
 		     exprp);
 		m_modp->addStmtp(assp);
 		if (debug()>=9) assp->dumpTree(cout,"     _new: ");
-	    } else if (nodep->modVarp()->isIfaceRef()) {
+	    } else if (nodep->modVarp()->isIfaceRef()
+		       || (nodep->modVarp()->subDTypep()->castUnpackArrayDType()
+			   && nodep->modVarp()->subDTypep()->castUnpackArrayDType()->subDTypep()->castIfaceRefDType())) {
 		// Create an AstAssignVarScope for Vars to Cells so we can link with their scope later
 		AstNode* lhsp = new AstVarXRef (exprp->fileline(), nodep->modVarp(), m_cellp->name(), false);
 		AstVarRef* refp = exprp->castVarRef();
@@ -171,7 +174,7 @@ private:
 	    m_cellRangep = nodep->rangep();
 	    UINFO(4,"  CELL   "<<nodep<<endl);
 
-	    AstVar *ifaceVarp = nodep->nextp()->castVar();
+	    AstVar* ifaceVarp = nodep->nextp()->castVar();
 	    bool isIface = ifaceVarp
 		&& ifaceVarp->dtypep()->castUnpackArrayDType()
 		&& ifaceVarp->dtypep()->castUnpackArrayDType()->subDTypep()->castIfaceRefDType();
@@ -192,9 +195,11 @@ private:
 		// If this AstCell is actually an interface instantiation, let's ensure we also clone
 		// the IfaceRef.
 		if (isIface) {
-		    AstUnpackArrayDType *arrdtype = ifaceVarp->dtypep()->castUnpackArrayDType();
+		    AstUnpackArrayDType* arrdtype = ifaceVarp->dtypep()->castUnpackArrayDType();
+		    AstIfaceRefDType* origIfaceRefp = arrdtype->subDTypep()->castIfaceRefDType();
+		    origIfaceRefp->cellp(NULL);
 		    AstVar* varNewp = ifaceVarp->cloneTree(false);
-		    AstIfaceRefDType *ifaceRefp = arrdtype->subDTypep()->castIfaceRefDType()->cloneTree(false);
+		    AstIfaceRefDType* ifaceRefp = arrdtype->subDTypep()->castIfaceRefDType()->cloneTree(false);
 		    arrdtype->addNextHere(ifaceRefp);
 		    ifaceRefp->cellp(newp);
 		    ifaceRefp->cellName(newp->name());
@@ -215,6 +220,33 @@ private:
 		ifaceVarp->unlinkFrBack(); pushDeletep(ifaceVarp); VL_DANGLING(ifaceVarp);
 	    }
 	    nodep->unlinkFrBack(); pushDeletep(nodep); VL_DANGLING(nodep);
+	} else {
+	    nodep->iterateChildren(*this);
+	}
+    }
+
+    virtual void visit(AstVar* nodep, AstNUser*) {
+	bool isIface = nodep->dtypep()->castUnpackArrayDType()
+	    && nodep->dtypep()->castUnpackArrayDType()->subDTypep()->castIfaceRefDType();
+	if (isIface) {
+	    AstUnpackArrayDType* arrdtype = nodep->dtypep()->castUnpackArrayDType();
+	    AstNode* prev = NULL;
+	    for (int i = arrdtype->lsb(); i <= arrdtype->msb(); ++i) {
+		AstVar* varNewp = nodep->cloneTree(false);
+		AstIfaceRefDType* ifaceRefp = arrdtype->subDTypep()->castIfaceRefDType()->cloneTree(false);
+		arrdtype->addNextHere(ifaceRefp);
+		ifaceRefp->cellp(NULL);
+		varNewp->name(varNewp->name() + "__BRA__" + cvtToStr(i) + "__KET__");
+		varNewp->origName(varNewp->origName() + "__BRA__" + cvtToStr(i) + "__KET__");
+		varNewp->dtypep(ifaceRefp);
+		if (!prev) {
+		    prev = varNewp;
+		} else {
+		    prev->addNextHere(varNewp);
+		}
+	    }
+	    nodep->addNextHere(prev);
+	    if (debug()==9) { prev->dumpTree(cout, "newintf: "); cout << endl; }
 	}
 	nodep->iterateChildren(*this);
     }
@@ -226,7 +258,20 @@ private:
 	    UINFO(4,"   PIN  "<<nodep<<endl);
 	    int pinwidth = nodep->modVarp()->width();
 	    int expwidth = nodep->exprp()->width();
-	    if (expwidth == pinwidth) {
+	    pair<uint32_t,uint32_t> pinDim = nodep->modVarp()->dtypep()->dimensions(false);
+	    pair<uint32_t,uint32_t> expDim = nodep->exprp()->dtypep()->dimensions(false);
+	    UINFO(4,"   PINVAR  "<<nodep->modVarp()<<endl);
+	    UINFO(4,"   EXP     "<<nodep->exprp()<<endl);
+	    UINFO(4,"   pinwidth ew="<<expwidth<<" pw="<<pinwidth
+		  <<"  ed="<<expDim.first<<","<<expDim.second
+		  <<"  pd="<<pinDim.first<<","<<pinDim.second<<endl);
+	    if (expDim.first == pinDim.first && expDim.second == pinDim.second+1) {
+		// Connection to array, where array dimensions match the instant dimension
+		AstNode* exprp = nodep->exprp()->unlinkFrBack();
+		exprp = new AstArraySel (exprp->fileline(), exprp,
+					 (m_instNum-m_instLsb));
+		nodep->exprp(exprp);
+	    } else if (expwidth == pinwidth) {
 		// NOP: Arrayed instants: widths match so connect to each instance
 	    } else if (expwidth == pinwidth*m_cellRangep->elementsConst()) {
 		// Arrayed instants: one bit for each of the instants (each assign is 1 pinwidth wide)
@@ -245,29 +290,69 @@ private:
 	    } else {
 		nodep->v3fatalSrc("Width mismatch; V3Width should have errored out.");
 	    }
-	} else if(AstArraySel *arrselp = nodep->exprp()->castArraySel()) {
-	    if (AstUnpackArrayDType *arrp = arrselp->lhsp()->dtypep()->castUnpackArrayDType()) {
+	} else if (AstArraySel* arrselp = nodep->exprp()->castArraySel()) {
+	    if (AstUnpackArrayDType* arrp = arrselp->lhsp()->dtypep()->castUnpackArrayDType()) {
 		if (!arrp->subDTypep()->castIfaceRefDType())
 		    return;
 
-		AstConst *constp = arrselp->rhsp()->castConst();
+		V3Const::constifyParamsEdit(arrselp->rhsp());
+		AstConst* constp = arrselp->rhsp()->castConst();
 		if (!constp) {
 		    nodep->v3error("Unsupported: Non-constant index when passing interface to module");
 		    return;
 		}
 		string index = AstNode::encodeNumber(constp->toSInt());
-		AstVarRef *varrefp = arrselp->lhsp()->castVarRef();
-		AstVarXRef *newp = new AstVarXRef(nodep->fileline(),varrefp->name () + "__BRA__" + index  + "__KET__", "", true);
-		AstVar *varp = varrefp->varp()->cloneTree(true);
-		varp->name(varp->name() + "__TMP__" + "__BRA__" + index  + "__KET__");
-		varp->dtypep(arrp->subDTypep()->backp()->castIfaceRefDType());
-		newp->addNextHere(varp);
-		newp->varp(varp);
-		newp->dtypep(arrp->subDTypep()->castIfaceRefDType());
+		AstVarRef* varrefp = arrselp->lhsp()->castVarRef();
+		AstVarXRef* newp = new AstVarXRef(nodep->fileline(),varrefp->name () + "__BRA__" + index  + "__KET__", "", true);
+		newp->dtypep(nodep->modVarp()->dtypep());
 		newp->packagep(varrefp->packagep());
 		arrselp->addNextHere(newp);
 		arrselp->unlinkFrBack()->deleteTree();
 	    }
+	} else {
+	    AstVar* pinVarp = nodep->modVarp();
+	    AstUnpackArrayDType* pinArrp = pinVarp->dtypep()->castUnpackArrayDType();
+	    if (!pinArrp || !pinArrp->subDTypep()->castIfaceRefDType())
+		return;
+	    AstNode* prevp = NULL;
+	    AstNode* prevPinp = NULL;
+	    // Clone the var referenced by the pin, and clone each var referenced by the varref
+	    // Clone pin varp:
+	    for (int i = pinArrp->lsb(); i <= pinArrp->msb(); ++i) {
+		AstVar* varNewp = pinVarp->cloneTree(false);
+		AstIfaceRefDType* ifaceRefp = pinArrp->subDTypep()->castIfaceRefDType();
+		ifaceRefp->cellp(NULL);
+		varNewp->name(varNewp->name() + "__BRA__" + cvtToStr(i) + "__KET__");
+		varNewp->origName(varNewp->origName() + "__BRA__" + cvtToStr(i) + "__KET__");
+		varNewp->dtypep(ifaceRefp);
+		if (!prevp) {
+		    prevp = varNewp;
+		} else {
+		    prevp->addNextHere(varNewp);
+		}
+		// Now also clone the pin itself and update its varref
+		AstPin* newp = nodep->cloneTree(false);
+		newp->modVarp(varNewp);
+		newp->name(newp->name() + "__BRA__" + cvtToStr(i) + "__KET__");
+		// And replace exprp with a new varxref
+		AstVarRef* varrefp = newp->exprp()->castVarRef();
+		string newname = varrefp->name () + "__BRA__" + cvtToStr(i) + "__KET__";
+		AstVarXRef* newVarXRefp = new AstVarXRef (nodep->fileline(), newname, "", true);
+		newVarXRefp->varp(newp->modVarp());
+		newVarXRefp->dtypep(newp->modVarp()->dtypep());
+		newp->exprp()->unlinkFrBack()->deleteTree();
+		newp->exprp(newVarXRefp);
+		if (!prevPinp) {
+		    prevPinp = newp;
+		} else {
+		    prevPinp->addNextHere(newp);
+		}
+	    }
+	    pinVarp->replaceWith(prevp);
+	    nodep->replaceWith(prevPinp);
+	    pushDeletep(pinVarp);
+	    pushDeletep(nodep);
+
 	}
     }
 
@@ -327,10 +412,10 @@ public:
 	AstVar* pinVarp = pinp->modVarp();
 	AstVarRef* connectRefp = pinp->exprp()->castVarRef();
 	AstVarXRef* connectXRefp = pinp->exprp()->castVarXRef();
-	AstBasicDType* pinBasicp = pinVarp->dtypep()->basicp();  // Maybe NULL
+	AstBasicDType* pinBasicp = pinVarp->dtypep()->castBasicDType();  // Maybe NULL
 	AstBasicDType* connBasicp = NULL;
 	AstAssignW* assignp = NULL;
-	if (connectRefp) connBasicp = connectRefp->varp()->dtypep()->basicp();
+	if (connectRefp) connBasicp = connectRefp->varp()->dtypep()->castBasicDType();
 	//
 	if (!alwaysCvt
 	    && connectRefp
@@ -343,6 +428,7 @@ public:
 	    // Done. Interface
 	} else if (!alwaysCvt
 		   && connectXRefp
+		   && connectXRefp->varp()
 		   && connectXRefp->varp()->isIfaceRef()) {
 	} else if (!alwaysCvt
 		   && connBasicp

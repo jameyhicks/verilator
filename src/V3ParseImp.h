@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2009-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2009-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -140,7 +140,7 @@ public:
     void verilatorCmtLintSave();
     void verilatorCmtLintRestore();
     void verilatorCmtBad(const char* text);
-    double parseDouble(const char* text, size_t length);
+    static double parseDouble(const char* text, size_t length, bool* successp = NULL);
     void pushBeginKeywords(int state) { m_inBeginKwd++; m_lastVerilogState=state; }
     bool popBeginKeywords() { if (m_inBeginKwd) { m_inBeginKwd--; return true; } else return false; }
     int lastVerilogState() const { return m_lastVerilogState; }

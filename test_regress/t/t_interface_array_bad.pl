@@ -12,8 +12,6 @@ compile (
 	expect=>
 '%Error: t/t_interface_array_bad.v:\d+: Expecting expression to be constant, but variable isn\'t const: bar
 %Error: t/t_interface_array_bad.v:\d+: Could not expand constant selection inside dotted reference: bar
-%Error: t/t_interface_array_bad.v:\d+: Can\'t find definition of \'a\' in dotted signal: .a
-%Error:      Known scopes under \'a\':.*
 %Error: Exiting due to.*',
     );
 

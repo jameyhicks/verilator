@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2009-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2009-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -118,7 +118,9 @@ public:
     }
     AstNode* findEntUpward (const string& name) {
 	// Lookup the given string as an identifier, return type of the id, scanning upward
-	return symCurrentp()->findIdFallback(name)->nodep();
+	VSymEnt* foundp = symCurrentp()->findIdFallback(name);
+	if (foundp) return foundp->nodep();
+	else return NULL;
     }
     void import(AstNode* packagep, const string& id_or_star) {
 	// Import from package::id_or_star to this

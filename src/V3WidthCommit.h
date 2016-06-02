@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -32,6 +32,7 @@
 //######################################################################
 
 /// Remove all $signed, $unsigned, we're done with them.
+/// This step is only called on real V3Width, not intermediate e.g. widthParams
 
 class WidthRemoveVisitor : public AstNVisitor {
 private:
@@ -127,8 +128,16 @@ private:
 	visitIterateNodeDType(nodep);
     }
     virtual void visit(AstNodeClassDType* nodep, AstNUser*) {
+	if (nodep->user1SetOnce()) return;  // Process once
 	visitIterateNodeDType(nodep);
 	nodep->clearCache();
+    }
+    virtual void visit(AstParamTypeDType* nodep, AstNUser*) {
+	if (nodep->user1SetOnce()) return;  // Process once
+	visitIterateNodeDType(nodep);
+	// Move to type table as all dtype pointers must resolve there
+	nodep->unlinkFrBack();  // Make non-child
+	v3Global.rootp()->typeTablep()->addTypesp(nodep);
     }
     void visitIterateNodeDType(AstNodeDType* nodep) {
 	// Rather than use dtypeChg which may make new nodes, we simply edit in place,

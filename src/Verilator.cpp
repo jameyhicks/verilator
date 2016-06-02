@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -39,6 +39,7 @@
 #include "V3Const.h"
 #include "V3Coverage.h"
 #include "V3CoverageJoin.h"
+#include "V3VarResets.h"
 #include "V3Dead.h"
 #include "V3Delayed.h"
 #include "V3Depth.h"
@@ -160,6 +161,8 @@ void process () {
     // Cross-link dotted hierarchical references
     V3LinkDot::linkDotPrimary(v3Global.rootp());
     v3Global.checkTree();  // Force a check, as link is most likely place for problems
+    // Check if all parameters have been found
+    v3Global.opt.checkParameters();
     // Correct state we couldn't know at parse time, repair SEL's
     V3LinkResolve::linkResolve(v3Global.rootp());
     // Set Lvalue's in variable refs
@@ -223,6 +226,7 @@ void process () {
     if (!v3Global.opt.xmlOnly()) {
 	// Remove cell arrays (must be between V3Width and scoping)
 	V3Inst::dearrayAll(v3Global.rootp());
+	V3LinkDot::linkDotArrayed(v3Global.rootp());
     }
 
     if (!v3Global.opt.xmlOnly()) {
@@ -281,7 +285,7 @@ void process () {
     if (!v3Global.opt.xmlOnly()) {
 	// Cleanup
 	V3Const::constifyAll(v3Global.rootp());
-	V3Dead::deadifyDTypes(v3Global.rootp());
+	V3Dead::deadifyDTypesScoped(v3Global.rootp());
 	v3Global.checkTree();
 
 	// Convert case statements to if() blocks.  Must be after V3Unknown
@@ -316,7 +320,7 @@ void process () {
 
 	// Cleanup
 	V3Const::constifyAll(v3Global.rootp());
-	V3Dead::deadifyDTypes(v3Global.rootp());
+	V3Dead::deadifyDTypesScoped(v3Global.rootp());
 	v3Global.checkTree();
 
 	// Detect clock enables and mode into sensitives, and split always based on clocks
@@ -356,7 +360,7 @@ void process () {
 
 	// Remove unused vars
 	V3Const::constifyAll(v3Global.rootp());
-	V3Dead::deadifyAll(v3Global.rootp());
+	V3Dead::deadifyAllScoped(v3Global.rootp());
 
 	// Clock domain crossing analysis
 	if (v3Global.opt.cdc()) {
@@ -401,7 +405,7 @@ void process () {
 
 	// Remove unused vars
 	V3Const::constifyAll(v3Global.rootp());
-	V3Dead::deadifyAll(v3Global.rootp());
+	V3Dead::deadifyAllScoped(v3Global.rootp());
 
 	// Detect change loop
 	V3Changed::changedAll(v3Global.rootp());
@@ -494,6 +498,10 @@ void process () {
     }
 
     V3Error::abortIfErrors();
+    if (!v3Global.opt.lintOnly()
+	&& !v3Global.opt.xmlOnly()) {
+	V3VarResets::emitResets();
+    }
 
     // Output the text
     if (!v3Global.opt.lintOnly()

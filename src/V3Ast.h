@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -26,6 +26,7 @@
 #include "V3FileLine.h"
 #include "V3Number.h"
 #include "V3Global.h"
+#include <string.h>
 #include <vector>
 #include <cmath>
 #include <map>
@@ -514,6 +515,7 @@ public:
     inline AstVarAttrClocker (en _e) : m_e(_e) {}
     explicit inline AstVarAttrClocker (int _e) : m_e(static_cast<en>(_e)) {}
     operator en () const { return m_e; }
+    bool unknown() const { return m_e==CLOCKER_UNKNOWN; }
     AstVarAttrClocker invert() const {
 	if (m_e==CLOCKER_YES) return CLOCKER_NO;
 	else if (m_e==CLOCKER_NO) return CLOCKER_YES;
@@ -861,7 +863,8 @@ public:
     }
 #include "V3Ast__gen_visitor.h"	// From ./astgen
     // Things like:
-    //  virtual void visit(type*) = 0;
+    //  virtual void visit(AstBreak* nodep, AstNUser* vup) { visit((AstNodeStmt*)(nodep),vup); }
+    //  virtual void visit(AstNodeStmt* nodep, AstNUser* vup) { visit((AstNode*)(nodep),vup); }
 };
 
 //######################################################################
@@ -998,10 +1001,10 @@ private:
     void	checkTreeIter(AstNode* backp);
     void	checkTreeIterList(AstNode* backp);
     bool	gateTreeIter();
-    bool	sameTreeIter(AstNode* node2p, bool ignNext, bool gateOnly);
+    bool	sameTreeIter(AstNode* node1p, AstNode* node2p, bool ignNext, bool gateOnly);
     void	deleteTreeIter();
-public:
     void	deleteNode();
+public:
     static void	relinkOneLink(AstNode*& pointpr, AstNode* newp);
     // cppcheck-suppress functionConst
     void	debugTreeChange(const char* prefix, int lineno, bool next);
@@ -1117,7 +1120,7 @@ public:
     void	user1p(void* userp) { m_user1p=(AstNUser*)(userp); m_user1Cnt=AstUser1InUse::s_userCntGbl; }
     int		user1() const { return user1p()->castInt(); }
     void	user1(int val) { user1p(AstNUser::fromInt(val)); }
-    int		user1Inc() { int v=user1(); user1(v+1); return v; }
+    int		user1Inc(int val=1) { int v=user1(); user1(v+val); return v; }
     int		user1SetOnce() { int v=user1(); if (!v) user1(1); return v; } // Better for cache than user1Inc()
     static void	user1ClearTree() { AstUser1InUse::clear(); }  // Clear userp()'s across the entire tree
 
@@ -1127,7 +1130,7 @@ public:
     void	user2p(void* userp) { m_user2p=(AstNUser*)(userp); m_user2Cnt=AstUser2InUse::s_userCntGbl; }
     int		user2() const { return user2p()->castInt(); }
     void	user2(int val) { user2p(AstNUser::fromInt(val)); }
-    int		user2Inc() { int v=user2(); user2(v+1); return v; }
+    int		user2Inc(int val=1) { int v=user2(); user2(v+val); return v; }
     int		user2SetOnce() { int v=user2(); if (!v) user2(1); return v; }
     static void	user2ClearTree() { AstUser2InUse::clear(); }
 
@@ -1137,7 +1140,7 @@ public:
     void	user3p(void* userp) { m_user3p=(AstNUser*)(userp); m_user3Cnt=AstUser3InUse::s_userCntGbl; }
     int		user3() const { return user3p()->castInt(); }
     void	user3(int val) { user3p(AstNUser::fromInt(val)); }
-    int		user3Inc() { int v=user3(); user3(v+1); return v; }
+    int		user3Inc(int val=1) { int v=user3(); user3(v+val); return v; }
     int		user3SetOnce() { int v=user3(); if (!v) user3(1); return v; }
     static void	user3ClearTree() { AstUser3InUse::clear(); }
 
@@ -1147,7 +1150,7 @@ public:
     void	user4p(void* userp) { m_user4p=(AstNUser*)(userp); m_user4Cnt=AstUser4InUse::s_userCntGbl; }
     int		user4() const { return user4p()->castInt(); }
     void	user4(int val) { user4p(AstNUser::fromInt(val)); }
-    int		user4Inc() { int v=user4(); user4(v+1); return v; }
+    int		user4Inc(int val=1) { int v=user4(); user4(v+val); return v; }
     int		user4SetOnce() { int v=user4(); if (!v) user4(1); return v; }
     static void	user4ClearTree() { AstUser4InUse::clear(); }
 
@@ -1157,7 +1160,7 @@ public:
     void	user5p(void* userp) { m_user5p=(AstNUser*)(userp); m_user5Cnt=AstUser5InUse::s_userCntGbl; }
     int		user5() const { return user5p()->castInt(); }
     void	user5(int val) { user5p(AstNUser::fromInt(val)); }
-    int		user5Inc() { int v=user5(); user5(v+1); return v; }
+    int		user5Inc(int val=1) { int v=user5(); user5(v+val); return v; }
     int		user5SetOnce() { int v=user5(); if (!v) user5(1); return v; }
     static void	user5ClearTree() { AstUser5InUse::clear(); }
 
@@ -1211,8 +1214,10 @@ public:
     void	dumpGdbHeader() const;
 
     // METHODS - Tree modifications
-    AstNode*	addNext(AstNode* newp);		// Returns this, adds to end of list
-    AstNode*	addNextNull(AstNode* newp);	// Returns this, adds to end of list, NULL is OK
+    static AstNode* addNext(AstNode* nodep, AstNode* newp);	// Returns nodep, adds newp to end of nodep's list
+    static AstNode* addNextNull(AstNode* nodep, AstNode* newp);	// Returns nodep, adds newp (maybe NULL) to end of nodep's list
+    inline AstNode* addNext(AstNode* newp) { return addNext(this, newp); }
+    inline AstNode* addNextNull(AstNode* newp) { return addNextNull(this, newp); }
     void	addNextHere(AstNode* newp);	// Adds after speced node
     void	addPrev(AstNode* newp) { replaceWith(newp); newp->addNext(this); }
     void	addHereThisAsNext(AstNode* newp); // Adds at old place of this, this becomes next
@@ -1265,7 +1270,6 @@ public:
     void	iterate(AstNVisitor& v, AstNUser* vup=NULL) { this->accept(v,vup); } 	  // Does this; excludes following this->next
     void	iterateAndNext(AstNVisitor& v, AstNUser* vup=NULL);
     void	iterateAndNextConst(AstNVisitor& v, AstNUser* vup=NULL);
-    void	iterateAndNextIgnoreEdit(AstNVisitor& v, AstNUser* vup=NULL) { iterateAndNextConst(v, vup); }
     void	iterateChildren(AstNVisitor& v, AstNUser* vup=NULL);  // Excludes following this->next
     void	iterateChildrenBackwards(AstNVisitor& v, AstNUser* vup=NULL);  // Excludes following this->next
     void	iterateChildrenConst(AstNVisitor& v, AstNUser* vup=NULL);  // Excludes following this->next
@@ -1967,8 +1971,8 @@ inline bool AstNode::isNeqZero()  { return (this->castConst() && this->castConst
 inline bool AstNode::isOne()      { return (this->castConst() && this->castConst()->num().isEqOne()); }
 inline bool AstNode::isAllOnes()  { return (this->castConst() && this->castConst()->isEqAllOnes()); }
 inline bool AstNode::isAllOnesV() { return (this->castConst() && this->castConst()->isEqAllOnesV()); }
-inline bool AstNode::sameTree(AstNode* node2p) { return sameTreeIter(node2p, true, false); }
-inline bool AstNode::sameGateTree(AstNode* node2p) { return sameTreeIter(node2p, true, true); }
+inline bool AstNode::sameTree(AstNode* node2p) { return sameTreeIter(this, node2p, true, false); }
+inline bool AstNode::sameGateTree(AstNode* node2p) { return sameTreeIter(this, node2p, true, true); }
 
 inline void AstNodeVarRef::init() { if (m_varp) dtypep(m_varp->dtypep()); }
 

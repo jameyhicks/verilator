@@ -1,7 +1,7 @@
 // -*- mode: C++; c-file-style: "cc-mode" -*-
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder. This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder. This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License.
 // Version 2.0.
@@ -374,7 +374,7 @@ void _vl_vsformat(string& output, const char* formatp, va_list ap) {
 		} else {
 		    lwp = va_arg(ap,WDataInP);
 		    ld = lwp[0];
-		    if (fmt == 'u' || fmt == 'd') fmt = 'x';  // Not supported, but show something
+		    if (fmt == 'd' || fmt == '#') fmt = 'x';  // Not supported, but show something
 		}
 		int lsb=lbits-1;
 		if (widthSet && width==0) while (lsb && !VL_BITISSET_W(lwp,lsb)) lsb--;
@@ -404,7 +404,7 @@ void _vl_vsformat(string& output, const char* formatp, va_list ap) {
 		    output += tmp;
 		    break;
 		}
-		case 'u': { // Unsigned decimal
+		case '#': { // Unsigned decimal
 		    int digits=sprintf(tmp,"%" VL_PRI64 "u",ld);
 		    int needmore = width-digits;
 		    if (needmore>0) {
@@ -438,6 +438,7 @@ void _vl_vsformat(string& output, const char* formatp, va_list ap) {
 			output += ((lwp[VL_BITWORD_I(lsb)]>>VL_BITBIT_I(lsb)) & 1) + '0';
 		    }
 		    break;
+		    break;
 		case 'o':
 		    for (; lsb>=0; lsb--) {
 			lsb = (lsb / 3) * 3; // Next digit
@@ -450,6 +451,28 @@ void _vl_vsformat(string& output, const char* formatp, va_list ap) {
 				   + ((VL_BITISSETLIMIT_W(lwp, lbits, lsb+2)) ? 4 : 0));
 		    }
 		    break;
+		case 'u':  // Packed 2-state
+		    output.reserve(output.size() + 4*VL_WORDS_I(lbits));
+		    for (int i=0; i<VL_WORDS_I(lbits); i++) {
+			output += (char)((lwp[i] >> 0) & 0xff);
+			output += (char)((lwp[i] >> 8) & 0xff);
+			output += (char)((lwp[i] >> 16) & 0xff);
+			output += (char)((lwp[i] >> 24) & 0xff);
+		    }
+		case 'z':  // Packed 4-state
+		    output.reserve(output.size() + 8*VL_WORDS_I(lbits));
+		    for (int i=0; i<VL_WORDS_I(lbits); i++) {
+			output += (char)((lwp[i] >> 0) & 0xff);
+			output += (char)((lwp[i] >> 8) & 0xff);
+			output += (char)((lwp[i] >> 16) & 0xff);
+			output += (char)((lwp[i] >> 24) & 0xff);
+			output += "\0\0\0\0"; // No tristate
+		    }
+		case 'v': // Strength; assume always strong
+		    for (lsb=lbits-1; lsb>=0; lsb--) {
+			if ((lwp[VL_BITWORD_I(lsb)]>>VL_BITBIT_I(lsb)) & 1) output += "St1 ";
+			else output += "St0 ";
+		    }
 		case 'x':
 		    for (; lsb>=0; lsb--) {
 			lsb = (lsb / 4) * 4; // Next digit
@@ -627,13 +650,14 @@ IData _vl_vsscanf(FILE* fp,  // If a fscanf
 		    _vl_vsss_skipspace(fp,floc,fromp,fstr);
 		    _vl_vsss_read(fp,floc,fromp,fstr, tmp, "+-.0123456789eE");
 		    if (!tmp[0]) goto done;
+		    // cppcheck-suppress unusedStructMember  // It's used
 		    union { double r; vlsint64_t ld; } u;
 		    u.r = strtod(tmp, NULL);
 		    VL_SET_WQ(owp,u.ld);
 		    break;
 		}
 		case 't': // FALLTHRU  // Time
-		case 'u': { // Unsigned decimal
+		case '#': { // Unsigned decimal
 		    _vl_vsss_skipspace(fp,floc,fromp,fstr);
 		    _vl_vsss_read(fp,floc,fromp,fstr, tmp, "0123456789+-xXzZ?_");
 		    if (!tmp[0]) goto done;
@@ -932,11 +956,18 @@ void VL_READMEM_W(bool hex, int width, int depth, int array_lsb, int fnwords,
 		  WDataInP ofilenamep, void* memp, IData start, IData end) {
     char ofilenamez[VL_TO_STRING_MAX_WORDS*VL_WORDSIZE+1];
     _VL_VINT_TO_STRING(fnwords*VL_WORDSIZE, ofilenamez, ofilenamep);
-    FILE* fp = fopen(ofilenamez, "r");
+    string ofilenames(ofilenamez);
+    return VL_READMEM_N(hex,width,depth,array_lsb,fnwords,ofilenames,memp,start,end);
+}
+
+void VL_READMEM_N(bool hex, int width, int depth, int array_lsb, int fnwords,
+		  const string& ofilenamep, void* memp, IData start, IData end) {
+    if (fnwords) {}
+    FILE* fp = fopen(ofilenamep.c_str(), "r");
     if (VL_UNLIKELY(!fp)) {
-	// We don't report the Verilog source filename as it slow to have to pass it down
-	vl_fatal (ofilenamez, 0, "", "$readmem file not found");
-	return;
+        // We don't report the Verilog source filename as it slow to have to pass it down
+        vl_fatal (ofilenamep.c_str(), 0, "", "$readmem file not found");
+        return;
     }
     // Prep for reading
     IData addr = start;
@@ -951,81 +982,81 @@ void VL_READMEM_W(bool hex, int width, int depth, int array_lsb, int fnwords,
     // We process a character at a time, as then we don't need to deal
     // with changing buffer sizes dynamically, etc.
     while (1) {
-	int c = fgetc(fp);
-	if (VL_UNLIKELY(c==EOF)) break;
-	//printf("%d: Got '%c' Addr%x IN%d IgE%d IgC%d ninc%d\n", linenum, c, addr, innum, ignore_to_eol, ignore_to_cmt, needinc);
-	if (c=='\n') { linenum++; ignore_to_eol=false; if (innum) reading_addr=false; innum=false; }
-	else if (c=='\t' || c==' ' || c=='\r' || c=='\f') { if (innum) reading_addr=false; innum=false; }
-	// Skip // comments and detect /* comments
-	else if (ignore_to_cmt && lastc=='*' && c=='/') {
-	    ignore_to_cmt = false; if (innum) reading_addr=false; innum=false;
-	} else if (!ignore_to_eol && !ignore_to_cmt) {
-	    if (lastc=='/' && c=='*') { ignore_to_cmt = true; }
-	    else if (lastc=='/' && c=='/') { ignore_to_eol = true; }
-	    else if (c=='/') {}  // Part of /* or //
-	    else if (c=='_') {}
-	    else if (c=='@') { reading_addr = true; innum=false; needinc=false; }
-	    // Check for hex or binary digits as file format requests
-	    else if (isxdigit(c)) {
-		c = tolower(c);
-		int value = (c >= 'a' ? (c-'a'+10) : (c-'0'));
-		if (!innum) {  // Prep for next number
-		    if (needinc) { addr++; needinc=false; }
-		}
-		if (reading_addr) {
-		    // Decode @ addresses
-		    if (!innum) addr=0;
-		    addr = (addr<<4) + value;
-		} else {
-		    needinc = true;
-		    //printf(" Value width=%d  @%x = %c\n", width, addr, c);
-		    if (VL_UNLIKELY(addr >= (IData)(depth+array_lsb) || addr < (IData)(array_lsb))) {
-			vl_fatal (ofilenamez, linenum, "", "$readmem file address beyond bounds of array");
-		    } else {
-			int entry = addr - array_lsb;
-			QData shift = hex ? VL_ULL(4) : VL_ULL(1);
-			// Shift value in
-			if (width<=8) {
-			    CData* datap = &((CData*)(memp))[entry];
-			    if (!innum) { *datap = 0; }
-			    *datap = ((*datap << shift) + value) & VL_MASK_I(width);
-			} else if (width<=16) {
-			    SData* datap = &((SData*)(memp))[entry];
-			    if (!innum) { *datap = 0; }
-			    *datap = ((*datap << shift) + value) & VL_MASK_I(width);
-			} else if (width<=VL_WORDSIZE) {
-			    IData* datap = &((IData*)(memp))[entry];
-			    if (!innum) { *datap = 0; }
-			    *datap = ((*datap << shift) + value) & VL_MASK_I(width);
-			} else if (width<=VL_QUADSIZE) {
-			    QData* datap = &((QData*)(memp))[entry];
-			    if (!innum) { *datap = 0; }
-			    *datap = ((*datap << (QData)(shift)) + (QData)(value)) & VL_MASK_Q(width);
-			} else {
-			    WDataOutP datap = &((WDataOutP)(memp))[ entry*VL_WORDS_I(width) ];
-			    if (!innum) { VL_ZERO_RESET_W(width, datap); }
-			    _VL_SHIFTL_INPLACE_W(width, datap, (IData)shift);
-			    datap[0] |= value;
-			}
-			if (VL_UNLIKELY(value>=(1<<shift))) {
-			    vl_fatal (ofilenamez, linenum, "", "$readmemb (binary) file contains hex characters");
-			}
-		    }
-		}
-		innum = true;
-	    }
-	    else {
-		vl_fatal (ofilenamez, linenum, "", "$readmem file syntax error");
-	    }
-	}
-	lastc = c;
+        int c = fgetc(fp);
+        if (VL_UNLIKELY(c==EOF)) break;
+        //printf("%d: Got '%c' Addr%x IN%d IgE%d IgC%d ninc%d\n", linenum, c, addr, innum, ignore_to_eol, ignore_to_cmt, needinc);
+        if (c=='\n') { linenum++; ignore_to_eol=false; if (innum) reading_addr=false; innum=false; }
+        else if (c=='\t' || c==' ' || c=='\r' || c=='\f') { if (innum) reading_addr=false; innum=false; }
+        // Skip // comments and detect /* comments
+        else if (ignore_to_cmt && lastc=='*' && c=='/') {
+            ignore_to_cmt = false; if (innum) reading_addr=false; innum=false;
+        } else if (!ignore_to_eol && !ignore_to_cmt) {
+            if (lastc=='/' && c=='*') { ignore_to_cmt = true; }
+            else if (lastc=='/' && c=='/') { ignore_to_eol = true; }
+            else if (c=='/') {}  // Part of /* or //
+            else if (c=='_') {}
+            else if (c=='@') { reading_addr = true; innum=false; needinc=false; }
+            // Check for hex or binary digits as file format requests
+            else if (isxdigit(c)) {
+                c = tolower(c);
+                int value = (c >= 'a' ? (c-'a'+10) : (c-'0'));
+                if (!innum) {  // Prep for next number
+                    if (needinc) { addr++; needinc=false; }
+                }
+                if (reading_addr) {
+                    // Decode @ addresses
+                    if (!innum) addr=0;
+                    addr = (addr<<4) + value;
+                } else {
+                    needinc = true;
+                    //printf(" Value width=%d  @%x = %c\n", width, addr, c);
+                    if (VL_UNLIKELY(addr >= (IData)(depth+array_lsb) || addr < (IData)(array_lsb))) {
+                        vl_fatal (ofilenamep.c_str(), linenum, "", "$readmem file address beyond bounds of array");
+                    } else {
+                        int entry = addr - array_lsb;
+                        QData shift = hex ? VL_ULL(4) : VL_ULL(1);
+                        // Shift value in
+                        if (width<=8) {
+                            CData* datap = &((CData*)(memp))[entry];
+                            if (!innum) { *datap = 0; }
+                            *datap = ((*datap << shift) + value) & VL_MASK_I(width);
+                        } else if (width<=16) {
+                            SData* datap = &((SData*)(memp))[entry];
+                            if (!innum) { *datap = 0; }
+                            *datap = ((*datap << shift) + value) & VL_MASK_I(width);
+                        } else if (width<=VL_WORDSIZE) {
+                            IData* datap = &((IData*)(memp))[entry];
+                            if (!innum) { *datap = 0; }
+                            *datap = ((*datap << shift) + value) & VL_MASK_I(width);
+                        } else if (width<=VL_QUADSIZE) {
+                            QData* datap = &((QData*)(memp))[entry];
+                            if (!innum) { *datap = 0; }
+                            *datap = ((*datap << (QData)(shift)) + (QData)(value)) & VL_MASK_Q(width);
+                        } else {
+                            WDataOutP datap = &((WDataOutP)(memp))[ entry*VL_WORDS_I(width) ];
+                            if (!innum) { VL_ZERO_RESET_W(width, datap); }
+                            _VL_SHIFTL_INPLACE_W(width, datap, (IData)shift);
+                            datap[0] |= value;
+                        }
+                        if (VL_UNLIKELY(value>=(1<<shift))) {
+                            vl_fatal (ofilenamep.c_str(), linenum, "", "$readmemb (binary) file contains hex characters");
+                        }
+                    }
+                }
+                innum = true;
+            }
+            else {
+                vl_fatal (ofilenamep.c_str(), linenum, "", "$readmem file syntax error");
+            }
+        }
+        lastc = c;
     }
     if (needinc) { addr++; needinc=false; }
 
     // Final checks
     fclose(fp);
     if (VL_UNLIKELY(end != VL_UL(0xffffffff) && addr != (end+1))) {
-	vl_fatal (ofilenamez, linenum, "", "$readmem file ended before specified ending-address");
+        vl_fatal (ofilenamep.c_str(), linenum, "", "$readmem file ended before specified ending-address");
     }
 }
 
@@ -1044,6 +1075,14 @@ IData VL_TESTPLUSARGS_I(const char* formatp) {
     const string& match = VerilatedImp::argPlusMatch(formatp);
     if (match == "") return 0;
     else return 1;
+}
+
+IData VL_VALUEPLUSARGS_IN(int, const char* prefixp, char, string& ldr) {
+    const string& match = VerilatedImp::argPlusMatch(prefixp);
+    const char* dp = match.c_str() + 1 /*leading + */ + strlen(prefixp);
+    if (match == "") return 0;
+    ldr = string(dp);
+    return 1;
 }
 
 IData VL_VALUEPLUSARGS_IW(int rbits, const char* prefixp, char fmt, WDataOutP rwp) {
@@ -1151,7 +1190,12 @@ void Verilated::commandArgs(int argc, const char** argv) {
 }
 
 const char* Verilated::commandArgsPlusMatch(const char* prefixp) {
-    return VerilatedImp::argPlusMatch(prefixp).c_str();
+    const string& match = VerilatedImp::argPlusMatch(prefixp);
+    static VL_THREAD char outstr[VL_VALUE_STRING_MAX_WIDTH];
+    if (match == "") return "";
+    strncpy(outstr, match.c_str(), VL_VALUE_STRING_MAX_WIDTH);
+    outstr[VL_VALUE_STRING_MAX_WIDTH-1] = '\0';
+    return outstr;
 }
 
 void Verilated::internalsDump() {
@@ -1296,7 +1340,7 @@ VerilatedVar* VerilatedScope::varFind(const char* namep) const {
     return NULL;
 }
 
-void* VerilatedScope::exportFindNullError(int funcnum) const {
+void* VerilatedScope::exportFindNullError(int funcnum) {
     // Slowpath - Called only when find has failed
     string msg = (string("Testbench C called '")
 		  +VerilatedImp::exportName(funcnum)

@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -99,7 +99,12 @@ class SliceCloneVisitor : public AstNVisitor {
 	// Reassign the bitp()
 	if (nodep->length() > 1) {
 	    if (AstConst* bitp = nodep->bitp()->castConst()) {
-		unsigned idx = nodep->start() + m_selBits[m_vecIdx][m_depth];
+		AstUnpackArrayDType* adtypep = nodep->fromp()->dtypep()->skipRefp()->castUnpackArrayDType();
+		if (!adtypep) nodep->v3fatalSrc("slice select tried to expand an array without an ArrayDType");
+		unsigned idx = nodep->start() + m_selBits[m_vecIdx][m_depth] - adtypep->lsb();
+		if (adtypep->rangep()->littleEndian()) {  // Little must iterate backwards
+		    idx = adtypep->rangep()->elementsConst() - 1 - idx;
+		}
 		AstNode* constp = new AstConst(bitp->fileline(), V3Number(bitp->fileline(), bitp->castConst()->num().width(), idx));
 		bitp->replaceWith(constp);
 	    } else {
@@ -253,15 +258,15 @@ class SliceVisitor : public AstNVisitor {
 	return clones;
     }
 
-    AstArraySel* insertImplicit(AstNode* nodep, unsigned start, unsigned count) {
+    AstArraySel* insertImplicit(AstNode* nodep, unsigned startDim, unsigned numDimensions) {
 	// Insert any implicit slices as explicit slices (ArraySel nodes).
 	// Return a new pointer to replace nodep() in the ArraySel.
-	UINFO(9,"  insertImplicit (start="<<start<<",c="<<count<<") "<<nodep<<endl);
+	UINFO(9,"  insertImplicit (startDim="<<startDim<<",c="<<numDimensions<<") "<<nodep<<endl);
 	AstVarRef* refp = nodep->user1p()->castNode()->castVarRef();
 	if (!refp) nodep->v3fatalSrc("No VarRef in user1 of node "<<nodep);
 	AstVar* varp = refp->varp();
 	AstNode* topp = nodep;
-	for (unsigned i = start; i < start + count; ++i) {
+	for (unsigned i = startDim; i < startDim + numDimensions; ++i) {
 	    AstNodeDType* dtypep = varp->dtypep()->dtypeDimensionp(i-1);
 	    AstUnpackArrayDType* adtypep = dtypep->castUnpackArrayDType();
 	    if (!adtypep) nodep->v3fatalSrc("insertImplicit tried to expand an array without an ArrayDType");
@@ -272,7 +277,9 @@ class SliceVisitor : public AstNVisitor {
 		int x = msb; msb = lsb; lsb = x;
 	    }
 	    UINFO(9,"    ArraySel-child: "<<topp<<endl);
-	    AstArraySel* newp = new AstArraySel(nodep->fileline(), topp, new AstConst(nodep->fileline(),lsb));
+	    AstArraySel* newp = new AstArraySel(nodep->fileline(), topp,
+						// Arrays are zero-based so index 0 is always lsb (e.g. lsb-lsb -> 0)
+						new AstConst(nodep->fileline(), 0));
 	    if (!newp->dtypep()) {
 		newp->v3fatalSrc("ArraySel dtyping failed when resolving slice");  // see ArraySel constructor
 	    }
@@ -361,6 +368,8 @@ class SliceVisitor : public AstNVisitor {
 	// The conditional must be a single bit so only look at the expressions
 	nodep->expr1p()->accept(*this);
 	nodep->expr2p()->accept(*this);
+	// Downstream data type may have changed; propagate up
+	nodep->dtypeFrom(nodep->expr1p());
     }
 
     // Return the first AstVarRef under the node
@@ -417,8 +426,7 @@ class SliceVisitor : public AstNVisitor {
 		    AstNode* lhsp = new AstArraySel(nodep->fileline(),
 						    nodep->lhsp()->cloneTree(false),
 						    index++);
-		    // cppcheck-suppress nullPointer
-		    newp = newp->addNext(nodep->cloneType(lhsp, subp->unlinkFrBack()));
+		    newp = AstNode::addNext(newp, nodep->cloneType(lhsp, subp->unlinkFrBack()));
 		}
 		//if (debug()>=9) newp->dumpTreeAndNext(cout, "-InitArrayOut: ");
 		nodep->replaceWith(newp);
@@ -447,18 +455,6 @@ class SliceVisitor : public AstNVisitor {
 		// Unpacked dimensions are referenced first, make sure we have them all
 		nodep->v3error("Unary operator used across unpacked dimensions");
 	    }
-	    //Dead code
-	    //else if ((int)(dim - (varDim.second)) < 0) {
-	    //	// Implicit packed dimensions are allowed, make them explicit
-	    //	uint32_t newDim = (varDim.second) - dim;
-	    //	AstNode* clonep = nodep->lhsp()->cloneTree(false);
-	    //	clonep->user1p(refp);
-	    //	AstNode* newp = insertImplicit(clonep, dim+1, newDim);
-	    //	nodep->lhsp()->replaceWith(newp); VL_DANGLING(refp);
-	    //	int clones = countClones(nodep->lhsp()->castArraySel());
-	    //	nodep->user2(clones);
-	    //	SliceCloneVisitor scv(nodep);
-	    //}
 	}
     }
     virtual void visit(AstRedOr* nodep, AstNUser*) {
@@ -503,5 +499,5 @@ public:
 void V3Slice::sliceAll(AstNetlist* rootp) {
     UINFO(2,__FUNCTION__<<": "<<endl);
     SliceVisitor visitor(rootp);
-    V3Global::dumpCheckGlobalTree("slices.tree", 0, v3Global.opt.dumpTreeLevel(__FILE__) >= 3);
+    V3Global::dumpCheckGlobalTree("slice.tree", 0, v3Global.opt.dumpTreeLevel(__FILE__) >= 3);
 }

@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -59,8 +59,8 @@ public:
     // CONSTRUCTORS
     LifeState() {}
     ~LifeState() {
-	V3Stats::addStat("Optimizations, Lifetime assign deletions", m_statAssnDel);
-	V3Stats::addStat("Optimizations, Lifetime constant prop", m_statAssnCon);
+	V3Stats::addStatSum("Optimizations, Lifetime assign deletions", m_statAssnDel);
+	V3Stats::addStatSum("Optimizations, Lifetime constant prop", m_statAssnCon);
 	for (vector<AstNode*>::iterator it = m_unlinkps.begin(); it != m_unlinkps.end(); ++it) {
 	    (*it)->unlinkFrBack();
 	    (*it)->deleteTree();

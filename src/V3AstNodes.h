@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -157,6 +157,39 @@ public:
 
 //######################################################################
 //==== Data Types
+
+class AstParamTypeDType : public AstNodeDType {
+    // Parents: MODULE
+    // A parameter type statement; much like a var or typedef
+private:
+    AstVarType	m_varType;	// Type of variable (for localparam vs. param)
+    string	m_name;		// Name of variable
+public:
+    AstParamTypeDType(FileLine* fl, AstVarType type, const string& name, VFlagChildDType, AstNodeDType* dtp)
+	: AstNodeDType(fl), m_varType(type), m_name(name) {
+	childDTypep(dtp);  // Only for parser
+	dtypep(NULL);  // V3Width will resolve
+    }
+    ASTNODE_NODE_FUNCS(ParamTypeDType, PARAMTYPEDTYPE)
+    AstNodeDType* getChildDTypep() const { return childDTypep(); }
+    AstNodeDType* childDTypep() const { return op1p()->castNodeDType(); } // op1 = Type assigning to
+    void	childDTypep(AstNodeDType* nodep) { setOp1p(nodep); }
+    AstNodeDType* subDTypep() const { return dtypep() ? dtypep() : childDTypep(); }
+    virtual AstBasicDType* basicp() const { return subDTypep()->basicp(); }  // (Slow) recurse down to find basic data type
+    virtual AstNodeDType* skipRefp() const { return subDTypep()->skipRefp(); }
+    virtual AstNodeDType* skipRefToConstp() const { return subDTypep()->skipRefToConstp(); }
+    virtual AstNodeDType* skipRefToEnump() const { return subDTypep()->skipRefToEnump(); }
+    virtual int widthAlignBytes() const { return dtypep()->widthAlignBytes(); }
+    virtual int widthTotalBytes() const { return dtypep()->widthTotalBytes(); }
+    // METHODS
+    virtual string name() const { return m_name; }
+    virtual bool maybePointedTo() const { return true; }
+    virtual bool hasDType() const { return true; }
+    void name(const string& flag) { m_name = flag; }
+    AstVarType varType() const { return m_varType; }  // * = Type of variable
+    bool isParam() const { return true; }
+    bool isGParam() const { return (varType()==AstVarType::GPARAM); }
+};
 
 class AstTypedef : public AstNode {
 private:
@@ -687,6 +720,24 @@ public:
     virtual AstNodeDType* skipRefToEnump() const { return (AstNodeDType*)this; }
     virtual int widthAlignBytes() const { return subDTypep()->widthAlignBytes(); }
     virtual int widthTotalBytes() const { return subDTypep()->widthTotalBytes(); }
+};
+
+class AstParseTypeDType : public AstNodeDType {
+    // Parents: VAR
+    // During parsing, this indicates the type of a parameter is a "parameter type"
+    // e.g. the data type is a container of any data type
+public:
+    AstParseTypeDType(FileLine* fl)
+	: AstNodeDType(fl) {}
+    ASTNODE_NODE_FUNCS(ParseTypeDType, PARSETYPEDTYPE)
+    AstNodeDType* dtypep() const { return NULL; }
+    // METHODS
+    virtual AstBasicDType* basicp() const { return NULL; }
+    virtual AstNodeDType* skipRefp() const { return NULL; }
+    virtual AstNodeDType* skipRefToConstp() const { return (AstNodeDType*)this; }
+    virtual AstNodeDType* skipRefToEnump() const { return (AstNodeDType*)this; }
+    virtual int widthAlignBytes() const { return 0; }
+    virtual int widthTotalBytes() const { return 0; }
 };
 
 //######################################################################
@@ -1333,6 +1384,7 @@ private:
     int		m_pinNum;	// Pin number
     string	m_name;		// Pin name, or "" for number based interconnect
     AstVar*	m_modVarp;	// Input/output this pin connects to on submodule.
+    AstParamTypeDType*	m_modPTypep;	// Param type this pin connects to on submodule.
     bool	m_param;	// Pin connects to parameter
     bool	m_svImplicit;	// Pin is SystemVerilog .name'ed
 public:
@@ -1341,6 +1393,7 @@ public:
 	,m_name(name), m_param(false), m_svImplicit(false) {
 	m_pinNum = pinNum;
 	m_modVarp = NULL;
+	m_modPTypep = NULL;
 	setNOp1p(exprp);
     }
     AstPin(FileLine* fl, int pinNum, AstVarRef* varname, AstNode* exprp)
@@ -1348,11 +1401,15 @@ public:
 	m_name = varname->name();
 	m_pinNum = pinNum;
 	m_modVarp = NULL;
+	m_modPTypep = NULL;
 	setNOp1p(exprp);
     }
     ASTNODE_NODE_FUNCS(Pin, PIN)
     virtual void dump(ostream& str);
-    virtual const char* broken() const { BROKEN_RTN(m_modVarp && !m_modVarp->brokeExists()); return NULL; }
+    virtual const char* broken() const {
+	BROKEN_RTN(m_modVarp && !m_modVarp->brokeExists());
+	BROKEN_RTN(m_modPTypep && !m_modPTypep->brokeExists());
+	return NULL; }
     virtual string name()	const { return m_name; }		// * = Pin name, ""=go by number
     virtual void name(const string& name) { m_name = name; }
     virtual string prettyOperatorName() const { return modVarp()
@@ -1363,7 +1420,9 @@ public:
     void	exprp(AstNode* nodep) { addOp1p(nodep); }
     AstNode*	exprp()		const { return op1p()->castNode(); }	// op1 = Expression connected to pin, NULL if unconnected
     AstVar*	modVarp()	const { return m_modVarp; }		// [After Link] Pointer to variable
-    void  	modVarp(AstVar* varp) { m_modVarp=varp; }
+    void  	modVarp(AstVar* nodep) { m_modVarp=nodep; }
+    AstParamTypeDType*	modPTypep()	const { return m_modPTypep; }		// [After Link] Pointer to variable
+    void  	modPTypep(AstParamTypeDType* nodep) { m_modPTypep=nodep; }
     bool	param()	const { return m_param; }
     void        param(bool flag) { m_param=flag; }
     bool	svImplicit() const { return m_svImplicit; }
@@ -1604,21 +1663,21 @@ public:
     AstNode* selp()		const { return op1p(); }	// op1 = Select expression
 };
 
-class AstUnlinkedVarXRef : public AstNode {
-    // As-of-yet unlinkable VarXRef
+class AstUnlinkedRef : public AstNode {
+    // As-of-yet unlinkable Ref
 private:
     string      m_name;    // Var name
 public:
-    AstUnlinkedVarXRef(FileLine* fl,
-	    AstVarXRef* vxrp, string name, AstNode* crp)
+    AstUnlinkedRef(FileLine* fl,
+		   AstNode* refp, string name, AstNode* crp)
 	: AstNode(fl)
 	, m_name(name) {
-	addNOp1p(vxrp); addNOp2p(crp); }
-    ASTNODE_NODE_FUNCS(UnlinkedVarXRef, UNLINKEDVARXREF)
+	addNOp1p(refp); addNOp2p(crp); }
+    ASTNODE_NODE_FUNCS(UnlinkedRef, UNLINKEDREF)
     // ACCESSORS
-    virtual string name()	const { return m_name; }	// * = Var name
-    AstVarXRef* varxrefp()	const { return op1p()->castVarXRef(); }	// op1 = VarXRef
-    AstNode* cellrefp()		const { return op2p(); }	// op1 = CellArrayRef or CellRef
+    virtual string name() const { return m_name; }	// * = Var name
+    AstNode* refp() const { return op1p(); }		// op1 = VarXRef or AstNodeFTaskRef
+    AstNode* cellrefp() const { return op2p(); }	// op2 = CellArrayRef or CellRef
 };
 
 class AstBind : public AstNode {
@@ -5097,6 +5156,21 @@ public:
     AstNode*	bodysp()	const { return op1p()->castNode(); }	// op1= expressions to print
 };
 
+
+class AstCReset : public AstNodeStmt {
+    //Reset variable at startup
+public:
+    AstCReset(FileLine* fl, AstNode* exprsp)
+	: AstNodeStmt(fl) {
+	addNOp1p(exprsp);
+    }
+    ASTNODE_NODE_FUNCS(CReset, CRESET)
+    virtual bool isGateOptimizable() const { return false; }
+    virtual bool isPredictOptimizable() const { return false; }
+    virtual V3Hash sameHash() const { return V3Hash(); }
+    virtual bool same(AstNode* samep) const { return true; }
+    AstVarRef* varrefp() const { return op1p()->castVarRef(); }	// op1= varref to reset
+};
 
 class AstCStmt : public AstNodeStmt {
     // Emit C statement

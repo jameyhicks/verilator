@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -20,6 +20,7 @@
 
 #include "config_build.h"
 #include "verilatedos.h"
+#include <string.h>
 #include <cmath>
 #include <cstdio>
 #include <cstdarg>
@@ -396,12 +397,12 @@ string V3Number::ascii(bool prefixed, bool cleanVerilog) const {
 
     if (binary) {
 	out<<"b";
-	out<<displayed("%0b");
+	out<<displayed(m_fileline, "%0b");
     }
     else {
 	if (prefixed) out<<"h";
 	// Always deal with 4 bits at once.  Note no 4-state, it's above.
-	out<<displayed("%0h");
+	out<<displayed(m_fileline, "%0h");
     }
     return out.str();
 }
@@ -409,9 +410,8 @@ string V3Number::ascii(bool prefixed, bool cleanVerilog) const {
 string V3Number::quoteNameControls(const string& namein) {
     // Encode control chars into C style escapes
     // Reverse is V3Parse::deQuote
-    const char* start = namein.c_str();
     string out;
-    for (const char* pos = start; *pos; pos++) {
+    for (string::const_iterator pos=namein.begin(); pos!=namein.end(); ++pos) {
 	if (pos[0]=='\\' || pos[0]=='"') {
 	    out += string("\\")+pos[0];
 	} else if (pos[0]=='\n') {
@@ -424,7 +424,8 @@ string V3Number::quoteNameControls(const string& namein) {
 	    out += pos[0];
 	} else {
 	    // This will also cover \a etc
-	    char octal[10]; sprintf(octal,"\\%03o",pos[0]);
+	    // Can't use %03o as messes up when signed
+	    char octal[10]; sprintf(octal,"\\%o%o%o",(pos[0]>>6)&3, (pos[0]>>3)&7, pos[0]&7);
 	    out += octal;
 	}
     }
@@ -442,16 +443,20 @@ bool V3Number::displayedFmtLegal(char format) {
     case 'g': return true;
     case 'h': return true;
     case 'o': return true;
+    case 'p': return true; // Pattern
     case 's': return true;
     case 't': return true;
+    case 'u': return true; // Packed 2-state
+    case 'v': return true; // Strength 
     case 'x': return true;
+    case 'z': return true; // Packed 4-state
     case '@': return true; // Packed string
     case '~': return true; // Signed decimal
     default: return false;
     }
 }
 
-string V3Number::displayed(const string& vformat) const {
+string V3Number::displayed(FileLine*fl, const string& vformat) const {
     string::const_iterator pos = vformat.begin();
     UASSERT(pos != vformat.end() && pos[0]=='%', "$display-like function with non format argument "<<*this);
     ++pos;
@@ -496,13 +501,11 @@ string V3Number::displayed(const string& vformat) const {
 	return str;
     }
     case 'c': {
-	if (this->width()>8) m_fileline->v3error("$display-like format of char of > 8 bit value");
-	int v = bitsValue(0, 8);
-	str += (char)(v);
+	if (this->width()>8) fl->v3warn(WIDTH,"$display-like format of %c format of > 8 bit value");
+	unsigned int v = bitsValue(0, 8);
+	char strc[2]; strc[0] = v&0xff; strc[1] = '\0';
+	str = strc;
 	return str;
-    }
-    case '@': {  // Packed string
-	return toString();
     }
     case 's': {
 	// Spec says always drop leading zeros, this isn't quite right, we space pad.
@@ -532,7 +535,7 @@ string V3Number::displayed(const string& vformat) const {
 	    fmtsize = cvtToStr(int(dchars));
 	}
 	if (width() > 64) {
-	    m_fileline->v3error("Unsupported: $display-like format of decimal of > 64 bit results (use hex format instead)");
+	    fl->v3error("Unsupported: $display-like format of decimal of > 64 bit results (use hex format instead)");
 	    return "ERR";
 	}
 	if (issigned) {
@@ -555,8 +558,45 @@ string V3Number::displayed(const string& vformat) const {
 	sprintf(tmp, vformat.c_str(), toDouble());
 	return tmp;
     }
+    // 'l'   // Library - converted to text by V3LinkResolve
+    // 'p'   // Packed - converted to another code by V3Width
+    case 'u': {  // Packed 2-state
+	for (int i=0; i<words(); i++) {
+	    str += (char)((m_value[i] >> 0) & 0xff);
+	    str += (char)((m_value[i] >> 8) & 0xff);
+	    str += (char)((m_value[i] >> 16) & 0xff);
+	    str += (char)((m_value[i] >> 24) & 0xff);
+	}
+	return str;
+    }
+    case 'z': {  // Packed 4-state
+	for (int i=0; i<words(); i++) {
+	    str += (char)((m_value[i] >> 0) & 0xff);
+	    str += (char)((m_value[i] >> 8) & 0xff);
+	    str += (char)((m_value[i] >> 16) & 0xff);
+	    str += (char)((m_value[i] >> 24) & 0xff);
+	    str += (char)((m_valueX[i] >> 0) & 0xff);
+	    str += (char)((m_valueX[i] >> 8) & 0xff);
+	    str += (char)((m_valueX[i] >> 16) & 0xff);
+	    str += (char)((m_valueX[i] >> 24) & 0xff);
+	}
+	return str;
+    }
+    case 'v': {  // Strength
+	int bit = width()-1;
+	for (; bit>=0; bit--) {
+	    if (bitIs0(bit)) str+="St0 ";  // Yes, always a space even for bit 0
+	    else if (bitIs1(bit)) str+="St1 ";
+	    else if (bitIsZ(bit)) str+="StZ ";
+	    else str+="StX";
+	}
+	return str;
+    }
+    case '@': {  // Packed string
+	return toString();
+    }
     default:
-	m_fileline->v3fatalSrc("Unknown $display-like format code for number: %"<<pos[0]);
+	fl->v3fatalSrc("Unknown $display-like format code for number: %"<<pos[0]);
 	return "ERR";
     }
 }
@@ -939,7 +979,7 @@ V3Number& V3Number::opRepl (const V3Number& lhs, const V3Number& rhs) {	// rhs i
 V3Number& V3Number::opRepl (const V3Number& lhs, uint32_t rhsval) {	// rhs is # of times to replicate
     // i op repl, L(i)*value(rhs) bit return
     setZero();
-    if (rhsval>8192) m_fileline->v3fatal("More than a 8k bit replication is probably wrong: "<<rhsval);
+    if (rhsval>8192) m_fileline->v3warn(WIDTHCONCAT,"More than a 8k bit replication is probably wrong: "<<rhsval);
     int obit = 0;
     for (unsigned times=0; times<rhsval; times++) {
 	for(int bit=0; bit<lhs.width(); bit++) {
@@ -1627,14 +1667,18 @@ V3Number& V3Number::opRealToBits (const V3Number& lhs) {
     if (lhs.width()!=64 || this->width()!=64) {
 	m_fileline->v3fatalSrc("Real operation on wrong sized number");
     }
-    return opAssign(lhs);
+    opAssign(lhs);
+    m_double = false;
+    return *this;
 }
 V3Number& V3Number::opBitsToRealD (const V3Number& lhs) {
     // Conveniently our internal format is identical so we can copy bits...
     if (lhs.width()!=64 || this->width()!=64) {
 	m_fileline->v3fatalSrc("Real operation on wrong sized number");
     }
-    return opAssign(lhs);
+    opAssign(lhs);
+    m_double = true;
+    return *this;
 }
 V3Number& V3Number::opNegateD (const V3Number& lhs) {
     return setDouble(- lhs.toDouble());

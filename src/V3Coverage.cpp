@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -87,7 +87,7 @@ private:
 	if (!nodep->isToggleCoverable())
 	    return "Not relevant signal type";
 	if (!v3Global.opt.coverageUnderscore()) {
-	    if (prettyName.c_str()[0] == '_')
+	    if (prettyName[0] == '_')
 	        return "Leading underscore";
 	    if (prettyName.find("._") != string::npos)
 	        return "Inlined leading underscore";

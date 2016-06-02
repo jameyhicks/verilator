@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -107,7 +107,7 @@ public:
     VSymEnt* parentp() const { return m_parentp; }
     void packagep(AstPackage* entp) { m_packagep = entp; }
     AstPackage* packagep() const { return m_packagep; }
-    AstNode* nodep() const { if (!this) return NULL; else return m_nodep; }  // null check so can call .findId(...)->nodep()
+    AstNode* nodep() const { return m_nodep; }
     string symPrefix() const { return m_symPrefix; }
     void symPrefix(const string& name) { m_symPrefix = name; }
     bool exported() const { return m_exported; }
@@ -284,7 +284,7 @@ inline VSymEnt::VSymEnt(VSymGraph* graphp, AstNode* nodep)
 }
 
 inline VSymEnt::VSymEnt(VSymGraph* graphp, const VSymEnt* symp)
-    : m_nodep(symp->nodep()) {
+    : m_nodep(symp->m_nodep) {
     m_fallbackp = symp->m_fallbackp;
     m_parentp  = symp->m_parentp;
     m_packagep = symp->m_packagep;

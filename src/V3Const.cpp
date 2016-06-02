@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -33,6 +33,7 @@
 #include <algorithm>
 
 #include "V3Global.h"
+#include "V3String.h"
 #include "V3Const.h"
 #include "V3Ast.h"
 #include "V3Width.h"
@@ -450,7 +451,6 @@ private:
 	if (!ifvarp || !elsevarp) return false;
 	if (ifvarp->isWide()) return false;  // Would need temporaries, so not worth it
 	if (!ifvarp->sameGateTree(elsevarp)) return false;
-	UINFO(1,"HERE "<<nodep<<endl);
 	if (!ifp->rhsp()->gateTree()) return false;
 	if (!elsep->rhsp()->gateTree()) return false;
 	return true;
@@ -1037,10 +1037,8 @@ private:
 		AstNodeAssign* asn2ap=nodep->cloneType(lc2p, sel2p)->castNodeAssign();
 		asn1ap->dtypeFrom(sel1p);
 		asn2ap->dtypeFrom(sel2p);
-		// cppcheck-suppress nullPointer  // addNext deals with it
-		newp = newp->addNext(asn1ap);
-		// cppcheck-suppress nullPointer  // addNext deals with it
-		newp = newp->addNext(asn2ap);
+		newp = AstNode::addNext(newp, asn1ap);
+		newp = AstNode::addNext(newp, asn2ap);
 	    } else {
 		if (!m_modp) nodep->v3fatalSrc("Not under module");
 		// We could create just one temp variable, but we'll get better optimization
@@ -1070,14 +1068,10 @@ private:
 		asn2ap->dtypeFrom(temp2p);
 		asn2bp->dtypeFrom(temp2p);
 		// This order matters
-		// cppcheck-suppress nullPointer  // addNext deals with it
-		newp = newp->addNext(asn1ap);
-		// cppcheck-suppress nullPointer  // addNext deals with it
-		newp = newp->addNext(asn2ap);
-		// cppcheck-suppress nullPointer  // addNext deals with it
-		newp = newp->addNext(asn1bp);
-		// cppcheck-suppress nullPointer  // addNext deals with it
-		newp = newp->addNext(asn2bp);
+		newp = AstNode::addNext(newp, asn1ap);
+		newp = AstNode::addNext(newp, asn2ap);
+		newp = AstNode::addNext(newp, asn1bp);
+		newp = AstNode::addNext(newp, asn2bp);
 	    }
 	    if (debug()>=9 && newp) newp->dumpTreeAndNext(cout,"     _new: ");
 	    nodep->addNextHere(newp);
@@ -1828,7 +1822,7 @@ private:
 	}
 	if (m_doNConst && anyconst) {
 	    //UINFO(9,"  Display in  "<<nodep->text()<<endl);
-	    string dispout = "";
+	    string newFormat = "";
 	    string fmt = "";
 	    bool inPct = false;
 	    AstNode* argp = nodep->exprsp();
@@ -1846,32 +1840,30 @@ private:
 		    switch (tolower(ch)) {
 		    case '%': break;  // %% - just output a %
 		    case 'm': break;  // %m - auto insert "name"
+		    case 'l': break;  // %l - auto insert "library"
 		    default:  // Most operators, just move to next argument
 			if (argp) {
 			    AstNode* nextp=argp->nextp();
 			    if (argp && argp->castConst()) { // Convert it
-				string out = argp->castConst()->num().displayed(fmt);
+				string out = argp->castConst()->num().displayed(nodep->fileline(), fmt);
 				UINFO(9,"     DispConst: "<<fmt<<" -> "<<out<<"  for "<<argp<<endl);
-				{   // fmt = out w/ replace % with %% as it must be literal.
-				    fmt = "";
-				    for (string::iterator pos = out.begin(); pos != out.end(); ++pos) {
-					if (*pos == '%') fmt += '%';
-					fmt += *pos;
-				    }
-				}
+				// fmt = out w/ replace % with %% as it must be literal.
+				fmt = VString::quotePercent(out);
 				argp->unlinkFrBack()->deleteTree();
 			    }
 			    argp=nextp;
 			}
 			break;
 		    } // switch
-		    dispout += fmt;
+		    newFormat += fmt;
 		} else {
-		    dispout += ch;
+		    newFormat += ch;
 		}
 	    }
-	    nodep->text(dispout);
-	    //UINFO(9,"  Display out "<<nodep->text()<<endl);
+	    if (newFormat != nodep->text()) {
+		nodep->text(newFormat);
+		UINFO(9,"  Display out "<<nodep<<endl);
+	    }
 	}
 	if (!nodep->exprsp()
 	    && nodep->name().find("%") == string::npos
@@ -2268,8 +2260,12 @@ private:
     virtual void visit(AstNode* nodep, AstNUser*) {
 	// Default: Just iterate
 	if (m_required) {
-	    nodep->v3error("Expecting expression to be constant, but can't convert a "
-			   <<nodep->prettyTypeName()<<" to constant.");
+	    if (nodep->castNodeDType() || nodep->castRange()) {
+		// Ignore dtypes for parameter type pins
+	    } else {
+		nodep->v3error("Expecting expression to be constant, but can't convert a "
+			       <<nodep->prettyTypeName()<<" to constant.");
+	    }
 	} else {
 	    // Calculate the width of this operation
 	    if (m_params && !nodep->width()) {

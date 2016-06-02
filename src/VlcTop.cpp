@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -239,8 +239,8 @@ void VlcTop::annotateOutputFiles(const string& dirname) {
 			first = false;
 			// Multiple columns on same line; print line just once
 			string indent = "";
-			for (const char* cp=line.c_str(); isspace(*cp); ++cp) {
-			    indent += *cp;
+			for (string::const_iterator pos=line.begin(); pos!=line.end() && isspace(*pos); ++pos) {
+			    indent += *pos;
 			}
 			line = indent + "verilator_coverage: (next point on previous line)\n";
 		    }

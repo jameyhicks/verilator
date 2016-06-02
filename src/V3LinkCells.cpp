@@ -6,7 +6,7 @@
 //
 //*************************************************************************
 //
-// Copyright 2003-2015 by Wilson Snyder.  This program is free software; you can
+// Copyright 2003-2016 by Wilson Snyder.  This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License
 // Version 2.0.
@@ -122,8 +122,14 @@ private:
 	return (nodep->user1p()->castGraphVertex());
     }
 
+    AstNodeModule* findModuleSym(const string& modName) {
+	VSymEnt* foundp = m_mods.rootp()->findIdFallback(modName);
+	if (!foundp) return NULL;
+	else return foundp->nodep()->castNodeModule();
+    }
+
     AstNodeModule* resolveModule(AstNode* nodep, const string& modName) {
-	AstNodeModule* modp = m_mods.rootp()->findIdFallback(modName)->nodep()->castNodeModule();
+	AstNodeModule* modp = findModuleSym(modName);
 	if (!modp) {
 	    // Read-subfile
 	    // If file not found, make AstNotFoundModule, rather than error out.
@@ -135,7 +141,7 @@ private:
 	    // We've read new modules, grab new pointers to their names
 	    readModNames();
 	    // Check again
-	    modp = m_mods.rootp()->findIdFallback(modName)->nodep()->castNodeModule();
+	    modp = findModuleSym(modName);
 	    if (!modp) {
 		// This shouldn't throw a message as parseFile will create a AstNotFoundModule for us
 		nodep->v3error("Can't resolve module reference: "<<prettyName);
@@ -349,16 +355,17 @@ private:
 	    // may remap interfaces to be more like a class.
 	    if (!nodep->hasIfaceVar()) {
 		string varName = nodep->name() + "__Viftop";  // V3LinkDot looks for this naming
-		AstIfaceRefDType *idtypep = new AstIfaceRefDType(nodep->fileline(), nodep->name(),
+		AstIfaceRefDType* idtypep = new AstIfaceRefDType(nodep->fileline(), nodep->name(),
 								 nodep->modp()->name());
 		idtypep->ifacep(NULL);  // cellp overrides
-		AstVar *varp;
+		// In the case of arrayed interfaces, we replace cellp when de-arraying in V3Inst
+		idtypep->cellp(nodep);  // Only set when real parent cell known.
+		AstVar* varp;
 		if (nodep->rangep()) {
-		    AstNodeArrayDType *arrp = new AstUnpackArrayDType(nodep->fileline(),VFlagChildDType(), idtypep, nodep->rangep()->cloneTree(true));
+		    AstNodeArrayDType* arrp = new AstUnpackArrayDType(nodep->fileline(),VFlagChildDType(), idtypep, nodep->rangep()->cloneTree(true));
 		    varp = new AstVar(nodep->fileline(), AstVarType::IFACEREF, varName,
 				      VFlagChildDType(), arrp);
 		} else {
-		    idtypep->cellp(nodep);  // Only set when real parent cell known
 		    varp = new AstVar(nodep->fileline(), AstVarType::IFACEREF, varName,
 				      VFlagChildDType(), idtypep);
 		}
@@ -386,7 +393,7 @@ private:
 	// Look at all modules, and store pointers to all module names
 	for (AstNodeModule* nextp,* nodep = v3Global.rootp()->modulesp(); nodep; nodep=nextp) {
 	    nextp = nodep->nextp()->castNodeModule();
-	    AstNode* foundp = m_mods.rootp()->findIdFallback(nodep->name())->nodep();
+	    AstNodeModule* foundp = findModuleSym(nodep->name());
 	    if (foundp && foundp != nodep) {
 		if (!(foundp->fileline()->warnIsOff(V3ErrorCode::MODDUP) || nodep->fileline()->warnIsOff(V3ErrorCode::MODDUP))) {
 		    nodep->v3warn(MODDUP,"Duplicate declaration of module: "<<nodep->prettyName()<<endl

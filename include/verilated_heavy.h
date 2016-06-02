@@ -1,7 +1,7 @@
 // -*- mode: C++; c-file-style: "cc-mode" -*-
 //*************************************************************************
 //
-// Copyright 2010-2015 by Wilson Snyder. This program is free software; you can
+// Copyright 2010-2016 by Wilson Snyder. This program is free software; you can
 // redistribute it and/or modify it under the terms of either the GNU
 // Lesser General Public License Version 3 or the Perl Artistic License.
 // Version 2.0.
@@ -61,8 +61,11 @@ inline string VL_REPLICATEN_NNI(int obits,int lbits,int rbits, const string& lhs
 }
 
 extern IData VL_FOPEN_NI(const string& filename, IData mode);
+extern void VL_READMEM_N(bool hex, int width, int depth, int array_lsb, int fnwords,
+                         const string& ofilename, void* memp, IData start, IData end);
 extern IData VL_SSCANF_INX(int lbits, const string& ld, const char* formatp, ...);
 extern void VL_SFORMAT_X(int obits_ignored, string &output, const char* formatp, ...);
 extern string VL_SFORMATF_NX(const char* formatp, ...);
+extern IData VL_VALUEPLUSARGS_IN(int rbits, const char* prefixp, char fmt, string& ldr);
 
 #endif // Guard
