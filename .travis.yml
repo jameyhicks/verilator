@@ -1,0 +1,15 @@
+language: cpp
+sudo: no
+dist: trusty
+os:
+- linux
+before_install:
+- autoreconf
+branches:
+  only:
+  - master
+notifications:
+  email: false
+  irc:
+    channels:
+    - chat.freenode.net#connectal
