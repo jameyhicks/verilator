@@ -20,7 +20,6 @@
 
 #include "config_build.h"
 #include "verilatedos.h"
-#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifndef _WIN32
