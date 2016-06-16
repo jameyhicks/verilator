@@ -30,8 +30,6 @@
 #include <set>
 #include <deque>
 
-using namespace std;
-
 //######################################################################
 
 class V3ErrorCode {
