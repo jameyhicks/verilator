@@ -16,10 +16,10 @@ notifications:
 script:
 - ./configure --prefix=/home/travis/verilator >> /dev/null && make -j4 >> /dev/null && make install >> /dev/null && tar -jcf verilator.tar.bz2 -C /home/travis verilator
 deploy:
+  on:
+    tags: true
   provider: releases
   api_key: $ACCESS_TOKEN
   file:
   - "verilator.tar.bz2"
   skip_cleanup: true
-  on:
-    tags: true
