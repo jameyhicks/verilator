@@ -14,7 +14,7 @@ notifications:
     channels:
     - chat.freenode.net#connectal
 script:
-- ./configure --prefix=/home/travis/verilator && make -j4 && make install && tar -jcf verilator.tar.bz2 -C /home/travis verilator
+- ./configure --prefix=/home/travis/verilator >> /dev/null && make -j4 >> /dev/null && make install >> /dev/null && tar -jcf verilator.tar.bz2 -C /home/travis verilator
 deploy:
   provider: releases
   api_key: $ACCESS_TOKEN
