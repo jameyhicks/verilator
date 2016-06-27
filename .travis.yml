@@ -13,3 +13,13 @@ notifications:
   irc:
     channels:
     - chat.freenode.net#connectal
+script:
+- ./configure --prefix=/home/travis/verilator && make -j4 && make install && tar -jcf verilator.tar.bz2 -C /home/travis verilator
+deploy:
+  provider: releases
+  api_key: $ACCESS_TOKEN
+  file:
+  - "verilator.tar.bz2"
+  skip_cleanup: true
+  on:
+    tags: true
