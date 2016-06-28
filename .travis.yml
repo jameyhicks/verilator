@@ -15,6 +15,7 @@ notifications:
     - chat.freenode.net#connectal
 script:
 - ./configure --prefix=/home/travis/verilator >> /dev/null && make -j4 >> /dev/null && make install >> /dev/null && tar -jcf verilator.tar.bz2 -C /home/travis verilator
+- echo done
 deploy:
   on:
     tags: true
