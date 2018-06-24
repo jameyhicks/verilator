@@ -537,53 +537,48 @@ void process () {
 	V3EmitXml::emitxml();
 #if 1
 std::map<std::string, std::string> pinDesc;
-    //if (0)
     if (AstNodeModule*      top = v3Global.rootp()->topModulep())
     for (AstNode* nodep=top->op2p(); nodep; nodep=nodep->nextp()) {
     if (AstVar *vn = nodep->castVar()) {
     std::string descr;
-    if (vn->isSc()) descr += " [SC]";
-    if (vn->isPrimaryIO()) descr += (vn->isInout()?" [PIO]":(vn->isInput()?" [PI]":" [PO]"));
-    else {
-        if (vn->isInout()) descr += " [IO]";
-        else if (vn->isInput()) descr += " [I]";
-        else if (vn->isOutput()) descr += " [O]";
-    }
-    if (vn->isConst()) descr += " [CONST]";
-    if (vn->isPullup()) descr += " [PULLUP]";
-    if (vn->isPulldown()) descr += " [PULLDOWN]";
-    if (vn->isUsedClock()) descr += " [CLK]";
-    if (vn->isSigPublic()) descr += " [P]";
-    if (vn->isUsedLoopIdx()) descr += " [LOOP]";
-    if (vn->attrClockEn()) descr += " [aCLKEN]";
-    if (vn->attrIsolateAssign()) descr += " [aISO]";
-    if (vn->attrFileDescr()) descr += " [aFD]";
-    if (vn->isFuncReturn()) descr += " [FUNCRTN]";
-    else if (vn->isFuncLocal()) descr += " [FUNC]";
-    if (!vn->attrClocker().unknown()) descr += " [" + std::string(vn->attrClocker().ascii()) + "] ";
+    if (vn->isPrimaryIO())
+        descr += "P";
+    if (vn->isInout())
+        descr += "IO";
+    else if (vn->isInput())
+        descr += "I";
+    else if (vn->isOutput())
+        descr += "O";
+    descr += ", ";
+    //if (vn->isSc()) descr += " [SC]";
+    //if (vn->isConst()) descr += " [CONST]";
+    //if (vn->isPullup()) descr += " [PULLUP]";
+    //if (vn->isPulldown()) descr += " [PULLDOWN]";
+    //if (vn->isUsedClock()) descr += " [CLK]";
+    //if (vn->isSigPublic()) descr += " [P]";
+    //if (vn->isUsedLoopIdx()) descr += " [LOOP]";
+    //if (vn->attrClockEn()) descr += " [aCLKEN]";
+    //if (vn->attrIsolateAssign()) descr += " [aISO]";
+    //if (vn->attrFileDescr()) descr += " [aFD]";
+    //if (vn->isFuncReturn()) descr += " [FUNCRTN]";
+    //else if (vn->isFuncLocal()) descr += " [FUNC]";
+    //if (!vn->attrClocker().unknown()) descr += " [" + std::string(vn->attrClocker().ascii()) + "] ";
     if (nodep->hasDType()) {
 	if (AstNodeDType* dtp = nodep->dtypep()) {
-    descr += std::string(" TYPEE(")
-       //+ std::string(dtp->generic()?"GENERIC/":"")
-       + ((dtp->isSigned()&&!dtp->isDouble())?"SIGNED ":"")
-       + (dtp->isNosign()?"":"NOT_NOSIGN ")
-       + (dtp->isDouble()?"DOUBLE ":"")
-       + (dtp->isString()?"STR ":"");
-    if (!dtp->isDouble() && !dtp->isString()) {
-        descr += std::string("WIDTH ")+ (dtp->widthSized()?"":"UNSIGNED ")+ autostr(dtp->width());
-    }
-    if (!dtp->widthSized()) descr += "UNSIZED/ "+ autostr(dtp->widthMin());
-    descr += ")";
+            if (!dtp->isDouble() && !dtp->isString())
+                descr += autostr(dtp->width());
+            if (!dtp->widthSized()) descr += "UNSIZED/ "+ autostr(dtp->widthMin());
 	}
     }
     if (pinDesc[nodep->name()] != "") {
-printf("[%s:%d] namedup %s %s\n", __FUNCTION__, __LINE__, nodep->name().c_str(), pinDesc[nodep->name()].c_str());
+        printf("[%s:%d] error: duplicate name %s %s\n", __FUNCTION__, __LINE__, nodep->name().c_str(), pinDesc[nodep->name()].c_str());
+        exit(-1);
     }
     pinDesc[nodep->name()] = descr;
     }
     }
     for (std::pair<std::string, std::string> item: pinDesc) {
-         printf("%s = %s\n", item.first.c_str(), item.second.c_str());
+         printf("%s, %s\n", item.first.c_str(), item.second.c_str());
     }
 #endif
     }
