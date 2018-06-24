@@ -150,6 +150,23 @@ void V3Global::dumpCheckGlobalTree(const string& filename, int newNumber, bool d
 
 //######################################################################
 
+static inline std::string autostr(uint64_t X, bool isNeg = false) {
+  char Buffer[21];
+  char *BufPtr = std::end(Buffer);
+
+  if (X == 0) *--BufPtr = '0';  // Handle special case...
+
+  while (X) {
+    *--BufPtr = '0' + char(X % 10);
+    X /= 10;
+  }
+
+  if (isNeg) *--BufPtr = '-';   // Add negative sign...
+  return std::string(BufPtr, std::end(Buffer));
+}
+
+//######################################################################
+
 void process () {
     // Sort modules by level so later algorithms don't need to care
     V3LinkLevel::modSortByLevel();
@@ -518,6 +535,57 @@ void process () {
 	// Check XML when debugging to make sure no missing node types
 	|| (v3Global.opt.debugCheck() && !v3Global.opt.lintOnly())) {
 	V3EmitXml::emitxml();
+#if 1
+std::map<std::string, std::string> pinDesc;
+    //if (0)
+    if (AstNodeModule*      top = v3Global.rootp()->topModulep())
+    for (AstNode* nodep=top->op2p(); nodep; nodep=nodep->nextp()) {
+    if (AstVar *vn = nodep->castVar()) {
+    std::string descr;
+    if (vn->isSc()) descr += " [SC]";
+    if (vn->isPrimaryIO()) descr += (vn->isInout()?" [PIO]":(vn->isInput()?" [PI]":" [PO]"));
+    else {
+        if (vn->isInout()) descr += " [IO]";
+        else if (vn->isInput()) descr += " [I]";
+        else if (vn->isOutput()) descr += " [O]";
+    }
+    if (vn->isConst()) descr += " [CONST]";
+    if (vn->isPullup()) descr += " [PULLUP]";
+    if (vn->isPulldown()) descr += " [PULLDOWN]";
+    if (vn->isUsedClock()) descr += " [CLK]";
+    if (vn->isSigPublic()) descr += " [P]";
+    if (vn->isUsedLoopIdx()) descr += " [LOOP]";
+    if (vn->attrClockEn()) descr += " [aCLKEN]";
+    if (vn->attrIsolateAssign()) descr += " [aISO]";
+    if (vn->attrFileDescr()) descr += " [aFD]";
+    if (vn->isFuncReturn()) descr += " [FUNCRTN]";
+    else if (vn->isFuncLocal()) descr += " [FUNC]";
+    if (!vn->attrClocker().unknown()) descr += " [" + std::string(vn->attrClocker().ascii()) + "] ";
+    if (nodep->hasDType()) {
+	if (AstNodeDType* dtp = nodep->dtypep()) {
+    descr += std::string(" TYPEE(")
+       //+ std::string(dtp->generic()?"GENERIC/":"")
+       + ((dtp->isSigned()&&!dtp->isDouble())?"SIGNED ":"")
+       + (dtp->isNosign()?"":"NOT_NOSIGN ")
+       + (dtp->isDouble()?"DOUBLE ":"")
+       + (dtp->isString()?"STR ":"");
+    if (!dtp->isDouble() && !dtp->isString()) {
+        descr += std::string("WIDTH ")+ (dtp->widthSized()?"":"UNSIGNED ")+ autostr(dtp->width());
+    }
+    if (!dtp->widthSized()) descr += "UNSIZED/ "+ autostr(dtp->widthMin());
+    descr += ")";
+	}
+    }
+    if (pinDesc[nodep->name()] != "") {
+printf("[%s:%d] namedup %s %s\n", __FUNCTION__, __LINE__, nodep->name().c_str(), pinDesc[nodep->name()].c_str());
+    }
+    pinDesc[nodep->name()] = descr;
+    }
+    }
+    for (std::pair<std::string, std::string> item: pinDesc) {
+         printf("%s = %s\n", item.first.c_str(), item.second.c_str());
+    }
+#endif
     }
 
     // Statistics
@@ -561,7 +629,7 @@ int main(int argc, char** argv, char** env) {
 	&& !v3Global.opt.lintOnly()
 	&& !v3Global.opt.xmlOnly()
 	&& !v3Global.opt.cdc()) {
-	v3fatal("verilator: Need --cc, --sc, --cdc, --lint-only, --xml_only or --E option");
+	v3fatal("verilator: Need --cc, --sc, --cdc, --lint-only, --xml-only or --E option");
     }
     // Check environment
     V3Options::getenvSYSTEMC();
