@@ -721,7 +721,17 @@ void V3Options::parseOptsList(FileLine* fl, const string& optdir, int argc, char
 	    else if ( onoff   (sw, "-vpi", flag/*ref*/) )		{ m_vpi = flag; }
 	    else if ( onoff   (sw, "-x-initial-edge", flag/*ref*/) )	{ m_xInitialEdge = flag; }
 	    else if ( onoff   (sw, "-xml-only", flag/*ref*/) )		{ m_xmlOnly = flag; }  // Undocumented, still experimental
-	    else if ( onoff   (sw, "-atomicc", flag/*ref*/) )		{ m_atomicc = flag; }  // Undocumented, still experimental
+	    else if ( onoff   (sw, "-atomicc", flag/*ref*/) )		{  // Atomicc module header parse
+                 m_atomicc = flag;
+		 FileLine::globalWarnLintOff(true);
+		 FileLine::globalWarnStyleOff(true);
+		 V3Error::warnFatal(false);
+                 static const char *msg[] = {"STMTDLY", "WIDTH", "REALCVT", "LITENDIAN", "IMPLICIT", NULL};
+                 for (int ind = 0; msg[ind]; ind++)
+		 if (!(FileLine::globalWarnOff(msg[ind], true))) {
+		     fl->v3fatal("Unknown warning specified: "<<sw);
+		 }
+            }
 	    // Optimization
 	    else if ( !strncmp (sw, "-O", 2) ) {
 		for (const char* cp=sw+strlen("-O"); *cp; ++cp) {

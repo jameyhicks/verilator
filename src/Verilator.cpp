@@ -195,12 +195,10 @@ void process () {
     V3Param::param(v3Global.rootp());
     V3LinkDot::linkDotParamed(v3Global.rootp());	// Cleanup as made new modules
     V3Error::abortIfErrors();
-#if 1
     if (v3Global.opt.atomiccOnly()) {
         // must do this here, before deadifyModules() deletes parameters
         V3OutFile of (v3Global.opt.makeDir()+"/"+v3Global.opt.prefix()+".atomicc", V3OutFormatter::LA_C);
-        std::map<std::string, std::string> pinDesc; // output names in alphabetic order
-        if (AstNodeModule*      top = v3Global.rootp()->topModulep()) {
+        if (AstNodeModule*      top = v3Global.rootp()->topModulep())
         for (AstNode* nodep=top->op2p(); nodep; nodep=nodep->nextp()) {
             AstVar *vn = nodep->castVar();
             if (!vn)
@@ -209,13 +207,13 @@ void process () {
             if (vn->isPrimaryIO())
                 descr += "P";
             if (vn->isInout())
-                descr += "IO";
+                descr += "inout  ";
             else if (vn->isInput())
-                descr += "I";
+                descr += "input  ";
             else if (vn->isOutput())
-                descr += "O";
+                descr += "output ";
             else if (vn->varType() == AstVarType::GPARAM)
-                descr += "PARAM";
+                descr += "parameter ";
             else {
                 if (vn->varType() != AstVarType::WIRE
                  && vn->varType() != AstVarType::VAR /* reg */
@@ -227,45 +225,33 @@ vn->dump(cout);
                 }
                 continue;
             }
-            descr += ", ";
             std::string typ = "1";
             if (nodep->hasDType())
             if (AstNodeDType* dtp = nodep->dtypep()) {
                 AstBasicDType* bdtp = dtp->basicp();
                 AstRange *range = bdtp->rangep();
                 std::string dname = dtp->name();
-                if (dname != "")
-                    typ = dname;
-                else if (dtp->isDouble())
+                if (dtp->isDouble())
                     typ = "DOUBLE";
                 else if (dtp->generic())
                     typ = "GENERIC";
                 else if (dtp->isString())
                     typ = "STRING";
+                else if (dname != "")
+                    typ = dname;
                 else {
                     if (!dtp->widthSized())
                         typ = "UNSIZED" + autostr(dtp->widthMin());
                     else
                         typ = autostr(dtp->width());
-printf("[%s:%d]DTYPE %s name %s range %p\n", __FUNCTION__, __LINE__, nodep->name().c_str(), dname.c_str(), range);
+//printf("[%s:%d]DTYPE %s name %s range %p\n", __FUNCTION__, __LINE__, nodep->name().c_str(), dname.c_str(), range);
 //dtp->dump(cout);
                 }
             }
-            descr += typ;
-            if (pinDesc[nodep->name()] != "") {
-                printf("[%s:%d] error: duplicate name %s %s\n", __FUNCTION__, __LINE__, nodep->name().c_str(), pinDesc[nodep->name()].c_str());
-                exit(-1);
-            }
-            pinDesc[nodep->name()] = descr;
+            of.puts(descr + typ + " " + nodep->name() + "\n");
         }
-        }
-        for (std::pair<std::string, std::string> item: pinDesc) {
-             of.puts(item.first + ", " + item.second + "\n");
-        }
-printf("[%s:%d] all done\n", __FUNCTION__, __LINE__);
         exit(0);
     }
-#endif
 
     // Remove any modules that were parameterized and are no longer referenced.
     V3Dead::deadifyModules(v3Global.rootp());
