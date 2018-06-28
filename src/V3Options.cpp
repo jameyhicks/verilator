@@ -721,6 +721,7 @@ void V3Options::parseOptsList(FileLine* fl, const string& optdir, int argc, char
 	    else if ( onoff   (sw, "-vpi", flag/*ref*/) )		{ m_vpi = flag; }
 	    else if ( onoff   (sw, "-x-initial-edge", flag/*ref*/) )	{ m_xInitialEdge = flag; }
 	    else if ( onoff   (sw, "-xml-only", flag/*ref*/) )		{ m_xmlOnly = flag; }  // Undocumented, still experimental
+	    else if ( onoff   (sw, "-atomicc", flag/*ref*/) )		{ m_atomicc = flag; }  // Undocumented, still experimental
 	    // Optimization
 	    else if ( !strncmp (sw, "-O", 2) ) {
 		for (const char* cp=sw+strlen("-O"); *cp; ++cp) {
@@ -1231,6 +1232,7 @@ V3Options::V3Options() {
     m_vpi = false;
     m_xInitialEdge = false;
     m_xmlOnly = false;
+    m_atomicc = false;
 
     m_convergeLimit = 100;
     m_dumpTree = 0;

@@ -102,6 +102,7 @@ class V3Options {
     bool	m_vpi;		// main switch: --vpi
     bool	m_xInitialEdge;	// main switch: --x-initial-edge
     bool	m_xmlOnly;	// main switch: --xml-netlist
+    bool	m_atomicc;	// main switch: --dump module header info
 
     int		m_convergeLimit;// main switch: --converge-limit
     int		m_dumpTree;	// main switch: --dump-tree
@@ -247,6 +248,7 @@ class V3Options {
     bool vpi() const { return m_vpi; }
     bool xInitialEdge() const { return m_xInitialEdge; }
     bool xmlOnly() const { return m_xmlOnly; }
+    bool atomiccOnly() const { return m_atomicc; }
 
     int	   convergeLimit() const { return m_convergeLimit; }
     int    dumpTree() const { return m_dumpTree; }

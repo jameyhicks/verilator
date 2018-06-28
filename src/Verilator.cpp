@@ -196,7 +196,7 @@ void process () {
     V3LinkDot::linkDotParamed(v3Global.rootp());	// Cleanup as made new modules
     V3Error::abortIfErrors();
 #if 1
-    if (v3Global.opt.xmlOnly()) {
+    if (v3Global.opt.atomiccOnly()) {
         // must do this here, before deadifyModules() deletes parameters
         V3OutFile of (v3Global.opt.makeDir()+"/"+v3Global.opt.prefix()+".atomicc", V3OutFormatter::LA_C);
         std::map<std::string, std::string> pinDesc; // output names in alphabetic order
@@ -648,6 +648,7 @@ int main(int argc, char** argv, char** env) {
 	&& !v3Global.opt.preprocOnly()
 	&& !v3Global.opt.lintOnly()
 	&& !v3Global.opt.xmlOnly()
+	&& !v3Global.opt.atomiccOnly()
 	&& !v3Global.opt.cdc()) {
 	v3fatal("verilator: Need --cc, --sc, --cdc, --lint-only, --xml-only or --E option");
     }
