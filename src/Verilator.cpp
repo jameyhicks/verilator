@@ -196,6 +196,8 @@ void process () {
     V3LinkDot::linkDotParamed(v3Global.rootp());	// Cleanup as made new modules
     V3Error::abortIfErrors();
     if (v3Global.opt.atomiccOnly()) {
+        // Calculate and check widths, edit tree to TRUNC/EXTRACT any width mismatches
+        V3Width::width(v3Global.rootp());
         // must do this here, before deadifyModules() deletes parameters
         V3OutFile of (v3Global.opt.makeDir()+"/"+v3Global.opt.prefix()+".atomicc", V3OutFormatter::LA_C);
         if (AstNodeModule*      top = v3Global.rootp()->topModulep())
@@ -204,6 +206,7 @@ void process () {
             if (!vn)
                 continue;
             std::string descr;
+            bool isParam = vn->varType() == AstVarType::GPARAM;
             if (vn->isPrimaryIO())
                 descr += "P";
             if (vn->isInout())
@@ -212,7 +215,7 @@ void process () {
                 descr += "input  ";
             else if (vn->isOutput())
                 descr += "output ";
-            else if (vn->varType() == AstVarType::GPARAM)
+            else if (isParam)
                 descr += "parameter ";
             else {
                 if (vn->varType() != AstVarType::WIRE
@@ -233,11 +236,11 @@ vn->dump(cout);
                 std::string dname = dtp->name();
                 if (dtp->isDouble())
                     typ = "DOUBLE";
-                else if (dtp->generic())
-                    typ = "GENERIC";
                 else if (dtp->isString())
                     typ = "STRING";
-                else if (dname != "")
+                else if (isParam && dtp->generic())
+                    typ = "GENERIC";
+                else if (isParam && dname != "")
                     typ = dname;
                 else {
                     if (!dtp->widthSized())
