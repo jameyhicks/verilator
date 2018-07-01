@@ -152,7 +152,8 @@ void V3Global::dumpCheckGlobalTree(const string& filename, int newNumber, bool d
 
 static inline std::string autostr(uint64_t X, bool isNeg = false) {
   char Buffer[21];
-  char *BufPtr = std::end(Buffer);
+  char *BufPtr = Buffer + sizeof(Buffer) - 1;
+  *--BufPtr = 0;    // nul terminate
 
   if (X == 0) *--BufPtr = '0';  // Handle special case...
 
@@ -162,7 +163,7 @@ static inline std::string autostr(uint64_t X, bool isNeg = false) {
   }
 
   if (isNeg) *--BufPtr = '-';   // Add negative sign...
-  return std::string(BufPtr, std::end(Buffer));
+  return BufPtr;
 }
 
 //######################################################################
