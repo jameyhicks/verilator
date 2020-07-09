@@ -28,6 +28,7 @@
 #include "V3Error.h"
 #include "V3FileLine.h"
 #include "V3Options.h"
+#include <list>
 
 class AstNetlist;
 
@@ -117,6 +118,7 @@ public:
 };
 
 extern V3Global v3Global;
+extern std::list<std::string> globalFilenameList;
 
 //######################################################################
 

@@ -1464,7 +1464,7 @@ private:
     void createImplicitVar (VSymEnt* lookupSymp, AstVarRef* nodep, AstNodeModule* modp, VSymEnt* moduleSymp, bool noWarn) {
 	// Create implicit after warning
 	if (!nodep->varp()) {
-	    if (!noWarn) {
+	    if (!noWarn && !v3Global.opt.atomiccOnly()) {
 		if (nodep->fileline()->warnIsOff(V3ErrorCode::I_DEF_NETTYPE_WIRE)) {
 		    nodep->v3error("Signal definition not found, and implicit disabled with `default_nettype: "<<nodep->prettyName());
 		} else {

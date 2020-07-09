@@ -167,6 +167,174 @@ static inline std::string autostr(uint64_t X, bool isNeg = false) {
 }
 
 //######################################################################
+#if 1
+std::string moduleName, moduleInterface;
+string decodeName(string mname)
+{
+    int i = 0;
+    while ((i = mname.find("__0", i)) >= 0) {
+        string start = mname.substr(0,i);
+        i += 2;
+        string end = mname.substr(i);
+        if (end.substr(0,3) == "024")
+            end = "$" + end.substr(3);
+        else if (end.substr(0,3) == "05F")
+            end = "_" + end.substr(3);
+        else
+            end = "__" + end;
+        mname = start + end;
+    }
+    return mname;
+}
+static bool jjdumpPtrs(ostream& os, AstNode *me, string indent)
+{
+    indent = "";
+    string tname = me->typeName();
+    string mname = decodeName(me->name());
+    if (AstVar *vn = me->castVar()) {
+        std::string descr;
+        bool isParam = vn->varType() == AstVarType::GPARAM;
+        if (vn->isPrimaryIO())
+            descr += "P";
+        if (vn->isInout())
+            descr += "inout  ";
+        else if (vn->isInput())
+            descr += "input  ";
+        else if (vn->isOutput())
+            descr += "output ";
+        else if (isParam)
+            descr += "parameter ";
+        else {
+            if (vn->varType() != AstVarType::WIRE
+             && vn->varType() != AstVarType::VAR /* reg */
+             && vn->varType() != AstVarType::TRI0 && vn->varType() != AstVarType::TRI1
+             && vn->varType() != AstVarType::LPARAM
+             && vn->varType() != AstVarType::GENVAR) {
+                 os << "PUNKKKK" << vn->varType().ascii() << " " << mname << endl;
+                 vn->dump(cout);
+            }
+            if (vn->varType() != AstVarType::WIRE /* verilog wire */
+            && vn->varType() != AstVarType::VAR) /* verilog reg */
+                 os << "BOGUS" << vn->varType().ascii() << " " << mname << endl;
+            goto zzendl;
+        }
+        std::string typ = "1";
+        if (me->hasDType())
+        if (AstNodeDType* dtp = me->dtypep()) {
+            AstBasicDType* bdtp = dtp->basicp();
+            AstRange *range = bdtp->rangep();
+            std::string dname = dtp->name();
+            if (dtp->isDouble())
+                typ = "DOUBLE";
+            else if (dtp->isString())
+                typ = "STRING";
+            else if (isParam && dtp->generic())
+                typ = "GENERIC";
+                    typ = "Bit(" + autostr(dtp->width()) + ")";
+        }
+        moduleInterface += "    FIELD/" + descr + typ + " " + mname + "\n";
+        return false;
+    }
+zzendl:;
+#if 0
+    if (tname == "VAR") { // wire
+#if 0
+        if (mname.substr(0,8) != "printfp$")
+            return false;                    // only dump global names
+#endif
+        os<<indent<<"    FIELD/external ";
+        if (me->hasDType()) {
+    	    if (AstNodeDType* dtp = me->dtypep()) {
+                os << "Bit(";
+                if (!dtp->widthSized())
+                    os<<"ERRORWIDTHSIZE";
+                if (!dtp->isDouble() && !dtp->isString())
+	            os<<dtp->width();
+                else
+                    os<<"ERRORWIDTH";
+                os << ")";
+    	    }
+            else {
+                os << " DTYPE=";
+    	        if (me->dtypep()==me) os<<" @dt="<<"this@";
+    	        else os<<" @dt="<<(void*)me->dtypep()<<"@";  // Final @ so less likely to by accident think it's nodep
+                os << " DTYPEEND";
+            }
+        }
+        os << " " << mname << endl;
+        return false;
+    }
+#endif
+    if (tname == "CELL" && !me->hasDType()) // local object declaration
+    if (AstCell* cellp = me->castCell()) {
+        os<<indent<<"    FIELD " << decodeName(cellp->modName()) << " " << mname << endl;
+        return false;
+    }
+    if (tname == "MODULE") {
+        os<<indent<<"MODULE " + mname + " " + mname + "_interface {" << endl;
+        moduleName = mname;
+        moduleInterface = "";
+        return false;
+    }
+    if (tname == "NETLIST" || tname == "NOTFOUNDMODULE" || tname == "FUNC" || tname == "TASK")
+        return false;
+    if (tname == "VAR" || tname == "VARREF" || tname == "CONST" || tname == "PIN" 
+     || tname == "LOGOR" || tname == "LOGAND" || tname == "LOGNOT" || tname == "EQ" || tname == "SEL"
+     || tname == "IF" || tname == "CONCAT" || tname == "OR" || tname == "COND"
+     || tname == "EXTEND" || tname == "REPLICATE" || tname == "ALWAYS"
+     || tname == "SENTREE" || tname == "SENITEM" || tname == "BEGIN"
+     || tname == "ASSIGNW" || tname == "ASSIGNDLY" || tname == "TYPETABLE" || tname == "BASICDTYPE") {
+        return true;
+    }
+    os<<indent<<"    ";
+    os<<"This="<<tname;
+    if (me->user1p()) os<<" user1p="<<(void*)me->user1p();
+    if (me->user2p()) os<<" user2p="<<(void*)me->user2p();
+    if (me->user3p()) os<<" user3p="<<(void*)me->user3p();
+    if (me->user4p()) os<<" user4p="<<(void*)me->user4p();
+    if (me->user5p()) os<<" user5p="<<(void*)me->user5p();
+    if (me->hasDType()) {
+	if (AstNodeDType* dtp = me->dtypep()) {
+            os << " SMALLTYPE=";
+	    dtp->dumpSmall(os);
+	}
+        else {
+            os << " DTYPE=";
+	    if (me->dtypep()==me) os<<" @dt="<<"this@";
+	    else os<<" @dt="<<(void*)me->dtypep()<<"@";  // Final @ so less likely to by accident think it's nodep
+            os << " DTYPEEND";
+        }
+    }
+    if (AstCell* cellp = me->castCell()) {
+        os << " CELLR=" << cellp->modName();
+        if (!cellp->modp())
+            os<<"[UNLINKED]";
+        os << ";";
+    }
+    if (mname != "") {
+        os << " NAME=" << mname;
+    }
+    os << endl;
+    return false;
+}
+
+static void jjdumpTree(ostream& os, AstNode *me, const string& indent)
+{
+    bool skip = jjdumpPtrs(os, me, indent);
+    if (skip)
+        return;
+    for (AstNode* nodep=me->op1p(); nodep; nodep=nodep->nextp()) { jjdumpTree(os,nodep, indent+"1:"); }
+    for (AstNode* nodep=me->op2p(); nodep; nodep=nodep->nextp()) { jjdumpTree(os,nodep, indent+"2:"); }
+    for (AstNode* nodep=me->op3p(); nodep; nodep=nodep->nextp()) { jjdumpTree(os,nodep, indent+"3:"); }
+    for (AstNode* nodep=me->op4p(); nodep; nodep=nodep->nextp()) { jjdumpTree(os,nodep, indent+"4:"); }
+    if (!strcmp(me->typeName(), "MODULE")) {
+        os << "}" << endl;
+        if (moduleInterface != "")
+            os<<"INTERFACE " << moduleName << "_interface {" << endl << moduleInterface << "}" << endl;
+        moduleInterface = "";
+    }
+}
+#endif
 
 void process () {
     // Sort modules by level so later algorithms don't need to care
@@ -200,6 +368,15 @@ void process () {
         // Calculate and check widths, edit tree to TRUNC/EXTRACT any width mismatches
         V3Width::width(v3Global.rootp());
         // must do this here, before deadifyModules() deletes parameters
+#if 1
+	const VL_UNIQUE_PTR<ofstream> logsp (V3File::new_ofstream(v3Global.opt.makeDir()+"/"+"linker.generated.IR", false));
+	if (logsp->fail()) v3fatalSrc("Can't write "<<"JDJDJD");
+	jjdumpTree(*logsp, v3Global.rootp(), "");
+        for (auto item: globalFilenameList) {
+            *logsp << "FILE " << item << endl;
+        }
+#endif
+#if 0
         V3OutFile of (v3Global.opt.makeDir()+"/"+v3Global.opt.prefix()+".atomicc", V3OutFormatter::LA_C);
         if (AstNodeModule*      top = v3Global.rootp()->topModulep())
         for (AstNode* nodep=top->op2p(); nodep; nodep=nodep->nextp()) {
@@ -254,6 +431,7 @@ vn->dump(cout);
             }
             of.puts(descr + typ + " " + nodep->name() + "\n");
         }
+#endif
         exit(0);
     }
 

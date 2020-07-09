@@ -2168,6 +2168,7 @@ private:
     }
     virtual void visit(AstCell* nodep, AstNUser*) {
 	if (!m_paramsOnly) {
+	    if (!v3Global.opt.atomiccOnly())
 	    if (nodep->modp()->castNotFoundModule()) {
 		// We've resolved parameters and hit a module that we couldn't resolve.  It's
 		// finally time to report it.

@@ -48,6 +48,7 @@
 //#define INFILTER_IPC_BUFSIZ 16
 #define INFILTER_IPC_BUFSIZ 64*1024  // For debug, try this as a small number
 #define INFILTER_CACHE_MAX  64*1024  // Maximum bytes to cache if same file read twice
+std::list<std::string> globalFilenameList;
 
 //######################################################################
 // V3File Internal state
@@ -300,6 +301,7 @@ private:
 	else return readContentsFile(filename,outl);
     }
     bool readContentsFile(const string& filename, StrList& outl) {
+        globalFilenameList.push_back(filename);
 	int fd = open (filename.c_str(), O_RDONLY);
 	if (fd<0) return false;
 	m_readEof = false;
