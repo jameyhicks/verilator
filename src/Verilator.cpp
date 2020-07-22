@@ -214,7 +214,8 @@ static bool jjdumpPtrs(ostream& os, AstNode *me, string indent)
                  vn->dump(cout);
             }
             if (vn->varType() != AstVarType::WIRE /* verilog wire */
-            && vn->varType() != AstVarType::VAR) /* verilog reg */
+             && vn->varType() != AstVarType::VAR  /* verilog reg */
+             && vn->varType() != AstVarType::GENVAR)
                  os << "BOGUS" << vn->varType().ascii() << " " << mname << endl;
             goto zzendl;
         }
@@ -283,6 +284,7 @@ zzendl:;
      || tname == "IF" || tname == "CONCAT" || tname == "OR" || tname == "COND"
      || tname == "EXTEND" || tname == "REPLICATE" || tname == "ALWAYS"
      || tname == "SENTREE" || tname == "SENITEM" || tname == "BEGIN"
+     || tname == "RANGE"
      || tname == "ASSIGNW" || tname == "ASSIGNDLY" || tname == "TYPETABLE" || tname == "BASICDTYPE") {
         return true;
     }
